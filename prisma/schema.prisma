@@ -1,0 +1,172 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model app_installs {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String?
+  device_id      String          @unique
+  platform       String
+  app_version    String?
+  installed_at   DateTime?       @default(now()) @db.Timestamptz(6)
+  last_active    DateTime?       @default(now()) @db.Timestamptz(6)
+  reminder_users reminder_users?
+
+  @@index([user_id], map: "idx_app_installs_user_id")
+}
+
+model reminder_content {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reminder_user_id String         @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title            String
+  description      String?
+  remind_at        DateTime       @db.Timestamptz(6)
+  status           ReminderStatus @default(PENDING)
+  created_at       DateTime       @db.Timestamptz(6)
+  updated_at       DateTime       @db.Timestamptz(6)
+  reminder_users   reminder_users @relation(fields: [reminder_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([remind_at])
+  @@index([reminder_user_id])
+}
+
+model reminder_users {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id          String             @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  max_reminders    Int                @default(7)
+  created_at       DateTime           @default(now())
+  reminder_content reminder_content[]
+  app_installs     app_installs       @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model users {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  external_id   String   @unique
+  created_at    DateTime @db.Timestamptz(6)
+  last_login_at DateTime @db.Timestamptz(6)
+  login_count   Int?     @default(0)
+}
+
+enum CampusLocation {
+  URBAN
+  RURAL
+}
+
+enum ReminderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+
+
+// =========================
+// ENUMS
+// =========================
+
+enum Algorithm {
+  ROUND_ROBIN
+  LEAST_CONNECTIONS
+  WEIGHTED_ROUND_ROBIN
+  IP_HASH
+  RANDOM
+  PRIORITY
+}
+
+enum ServerHealth {
+  HEALTHY
+  UNHEALTHY
+  UNKNOWN
+}
+
+// =========================
+// SERVER
+// =========================
+
+model Server {
+  id                  String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                String
+  url                 String       @unique
+  enabled             Boolean      @default(true)
+  healthy             ServerHealth @default(UNKNOWN)
+  weight              Int          @default(1)
+  priority            Int          @default(0)
+  requestsHandled     Int          @default(0) @map("requests_handled")
+  activeRequests      Int          @default(0) @map("active_requests")
+  lastHealthCheck     DateTime?    @map("last_health_check") @db.Timestamptz(6)
+  averageResponseTime Float        @default(0) @map("average_response_time")
+  failureCount        Int          @default(0) @map("failure_count")
+  deletedAt           DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([enabled, healthy])
+  @@index([priority])
+  @@index([deletedAt])
+  @@map("servers")
+}
+
+// =========================
+// SETTINGS
+// =========================
+
+model Settings {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  algorithm           Algorithm @default(ROUND_ROBIN)
+  healthCheckInterval Int       @default(30) @map("health_check_interval")
+  healthCheckTimeout  Int       @default(5)  @map("health_check_timeout")
+  maxFailures         Int       @default(3)  @map("max_failures")
+  autoRecovery        Boolean   @default(true) @map("auto_recovery")
+  requestTimeout      Int       @default(10000) @map("request_timeout")
+  maxRetries          Int       @default(3)  @map("max_retries")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("settings")
+}
+
+// =========================
+// HTTP METHOD ENUM
+// =========================
+
+enum HttpMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+  HEAD
+  OPTIONS
+}
+
+// =========================
+// REQUEST LOG
+// =========================
+
+model RequestLog {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId      String     @map("request_id") @db.Uuid
+  method         HttpMethod
+  route          String
+  backendId      String?    @map("backend_id") @db.Uuid
+  backendUrl     String?    @map("backend_url")
+  statusCode     Int?       @map("status_code")
+  responseTimeMs Int?       @map("response_time_ms")
+  retryCount     Int        @default(0) @map("retry_count")
+  errorMessage   String?    @map("error_message")
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@index([requestId])
+  @@index([backendId])
+  @@index([statusCode])
+  @@index([method])
+  @@map("request_logs")
+}

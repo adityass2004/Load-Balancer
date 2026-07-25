@@ -1,0 +1,10 @@
+.env
+.env.example
+.next/
+node_modules/
+.DS_Store
+*.log
+
+.vercel
+.vscode/
+scratch/
