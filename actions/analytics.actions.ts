@@ -7,7 +7,12 @@ import type {
   ServerMetric,
   ChartDataPoint,
   HealthDistributionItem,
+  CombinedDashboardData,
 } from '@/types/domain';
+
+export async function getDashboardSnapshotAction(): Promise<ActionResult<CombinedDashboardData>> {
+  return analyticsService.getDashboardSnapshot();
+}
 
 export async function getDashboardStatsAction(): Promise<ActionResult<DashboardStats>> {
   return analyticsService.getDashboardStats();
@@ -39,4 +44,14 @@ export async function getHealthDistributionAction(): Promise<ActionResult<Health
 
 export async function getActiveConnectionsOverTimeAction(): Promise<ActionResult<ChartDataPoint[]>> {
   return analyticsService.getActiveConnectionsOverTime();
+}
+
+export async function triggerHealthCheckAction() {
+  try {
+    const { healthScheduler } = await import('@/services/health/HealthScheduler');
+    const results = await healthScheduler.checkAllServers();
+    return { success: true, data: results };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
 }

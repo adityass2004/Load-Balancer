@@ -3,7 +3,14 @@ type CacheEntry<T> = {
   expiry: number;
 };
 
-export class InMemoryCache {
+export interface ICacheStore {
+  get<T>(key: string): Promise<T | null> | T | null;
+  set<T>(key: string, data: T, ttlMs: number): Promise<void> | void;
+  delete(key: string): Promise<void> | void;
+  clear(): Promise<void> | void;
+}
+
+export class SharedCacheStore implements ICacheStore {
   private store = new Map<string, CacheEntry<any>>();
 
   get<T>(key: string): T | null {
@@ -32,4 +39,4 @@ export class InMemoryCache {
   }
 }
 
-export const globalCache = new InMemoryCache();
+export const globalCache: ICacheStore = new SharedCacheStore();

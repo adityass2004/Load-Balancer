@@ -101,3 +101,14 @@ export type HealthDistributionItem = {
   value: number;
   color: string;
 };
+
+export type CombinedDashboardData = {
+  stats: DashboardStats | null;
+  serverMetrics: ServerMetric[];
+  requestsOverTime: ChartDataPoint[];
+  responseTimeOverTime: ChartDataPoint[];
+  requestsPerServer: ChartDataPoint[];
+  healthDistribution: HealthDistributionItem[];
+  activeConnections: ChartDataPoint[];
+  timestamp: string;
+};

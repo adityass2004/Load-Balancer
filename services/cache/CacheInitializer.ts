@@ -34,7 +34,7 @@ class CacheInitializer {
   }
 
   private startAutoRefresh(): void {
-    if (this.refreshInterval) return;
+    if (this.refreshInterval || process.env.NODE_ENV !== 'development') return;
 
     this.refreshInterval = setInterval(async () => {
       try {

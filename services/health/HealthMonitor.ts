@@ -25,20 +25,17 @@ export class HealthMonitor {
   }
 
   async start(): Promise<HealthCheckResult[]> {
-    if (this.intervalHandle) {
-      console.log('[HealthMonitor] Already running — skipping start');
-      return [];
-    }
-
-    console.log(`[HealthMonitor] Starting. Interval: ${this.config.intervalMs}ms | Timeout: ${this.config.timeoutMs}ms | MaxFailures: ${this.config.maxFailures}`);
+    console.log(`[HealthMonitor] Initializing check cycle. Interval: ${this.config.intervalMs}ms | Timeout: ${this.config.timeoutMs}ms | MaxFailures: ${this.config.maxFailures}`);
 
     this.status.running = true;
 
     const firstResults = await this.runCycle();
 
-    this.intervalHandle = setInterval(() => {
-      this.runCycle();
-    }, this.config.intervalMs);
+    if (process.env.NODE_ENV === 'development' && !this.intervalHandle) {
+      this.intervalHandle = setInterval(() => {
+        this.runCycle();
+      }, Math.max(30000, this.config.intervalMs));
+    }
 
     return firstResults;
   }

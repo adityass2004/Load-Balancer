@@ -1,4 +1,4 @@
-# TrackIt Load Balancer
+# Load Balancer
 
 Production-grade load balancer monitoring dashboard built with Next.js 15.
 
@@ -18,7 +18,7 @@ Production-grade load balancer monitoring dashboard built with Next.js 15.
 ## Project Structure
 
 ```
-trackit-load-balancer/
+load-balancer/
 ├── app/                  # App Router pages & API routes
 │   ├── (dashboard)/      # Dashboard route group
 │   ├── api/health/       # Health check endpoint

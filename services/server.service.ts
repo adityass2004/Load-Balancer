@@ -1,4 +1,5 @@
 import { serverRepository } from '@/repositories/server.repository';
+import { cacheService } from '@/services/cache/CacheService';
 import { ConflictError, toActionError } from '@/lib/errors';
 import { ok, fail, paginated, buildPaginationMeta } from '@/lib/response';
 import type {
@@ -38,7 +39,9 @@ export const serverService = {
   async getEnabled(): Promise<ActionResult<Server[]>> {
     try {
       const data = await serverRepository.findEnabled();
-      return ok(data);
+      await cacheService.refreshServers();
+      const merged = cacheService.mergeRuntimeState(data);
+      return ok(merged);
     } catch (e) {
       return fail(e);
     }

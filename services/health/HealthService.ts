@@ -90,10 +90,11 @@ class HealthService implements IHealthService {
 
     if (statusChanged) {
       log('recovered', server, `Recovered → HEALTHY. Latency: ${result.latencyMs}ms`);
-      healthRepository.markHealthy(server.id, result.latencyMs!, result.checkedAt).catch((e) => {
-        log('error', server, `DB persist failed (markHealthy): ${(e as Error).message}`);
-      });
     }
+
+    healthRepository.markHealthy(server.id, result.latencyMs!, result.checkedAt).catch((e) => {
+      log('error', server, `DB persist failed (markHealthy): ${(e as Error).message}`);
+    });
   }
 
   private handleFailure(server: Server, result: HealthCheckResult): void {
@@ -115,10 +116,11 @@ class HealthService implements IHealthService {
 
       if (statusChanged) {
         log('failed', server, `Transitioning → UNHEALTHY after ${newFailureCount} failures. Reason: ${result.error} [${result.outcome}]`);
-        healthRepository.markUnhealthy(server.id, newFailureCount, result.checkedAt).catch((e) => {
-          log('error', server, `DB persist failed (markUnhealthy): ${(e as Error).message}`);
-        });
       }
+
+      healthRepository.markUnhealthy(server.id, newFailureCount, result.checkedAt).catch((e) => {
+        log('error', server, `DB persist failed (markUnhealthy): ${(e as Error).message}`);
+      });
     } else {
       cacheService.setRuntimeHealthState(
         server.id,

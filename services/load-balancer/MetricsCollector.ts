@@ -7,7 +7,6 @@ export class MetricsCollector {
   recordRequestStart(serverId: string): void {
     cacheService.updateRuntimeMetrics(serverId, {
       activeRequests: +1,
-      requestsHandled: +1,
     });
 
     serverRepository.incrementRequests(serverId).catch((err) => {
@@ -23,7 +22,6 @@ export class MetricsCollector {
   ): Promise<void> {
     cacheService.updateRuntimeMetrics(serverId, {
       activeRequests: -1,
-      latencyMs,
       success,
     });
 
@@ -55,10 +53,10 @@ export class MetricsCollector {
     }
 
     serverRepository
-      .decrementActiveRequests(serverId)
+      .recordRequestCompletion(serverId, { latencyMs, success })
       .catch((err) => {
         console.error(
-          `[METRICS] Failed to persist decrementActiveRequests for ${serverId}:`,
+          `[METRICS] Failed to persist recordRequestCompletion for ${serverId}:`,
           err.message
         );
       });

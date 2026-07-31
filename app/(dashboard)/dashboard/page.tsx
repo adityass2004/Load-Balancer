@@ -1,15 +1,7 @@
 'use client';
 
 import React from 'react';
-import {
-  useDashboardStats,
-  useServerMetrics,
-  useRequestsOverTime,
-  useResponseTimeOverTime,
-  useRequestsPerServer,
-  useHealthDistribution,
-  useActiveConnections,
-} from '@/hooks/useAnalytics';
+import { useDashboardData } from '@/hooks/useAnalytics';
 import { StatsGrid } from '@/components/dashboard/StatsGrid';
 import { ServerMetricsTable } from '@/components/dashboard/ServerMetricsTable';
 import { RequestsOverTimeChart } from '@/components/charts/RequestsOverTimeChart';
@@ -62,21 +54,19 @@ function LiveIndicator() {
 }
 
 export default function DashboardPage() {
-  const { data: statsResult, isLoading: statsLoading } = useDashboardStats();
-  const { data: metricsResult, isLoading: metricsLoading } = useServerMetrics();
-  const { data: reqOverTime } = useRequestsOverTime(24);
-  const { data: respOverTime } = useResponseTimeOverTime(24);
-  const { data: perServer } = useRequestsPerServer();
-  const { data: healthDist } = useHealthDistribution();
-  const { data: activeConn } = useActiveConnections();
+  const { data: snapshotResult, isLoading } = useDashboardData();
 
-  const stats = statsResult?.success ? statsResult.data : null;
-  const metrics = metricsResult?.success ? metricsResult.data : [];
-  const requestsOverTime = reqOverTime?.success ? reqOverTime.data : [];
-  const responseOverTime = respOverTime?.success ? respOverTime.data : [];
-  const perServerData = perServer?.success ? perServer.data : [];
-  const healthData = healthDist?.success ? healthDist.data : [];
-  const activeData = activeConn?.success ? activeConn.data : [];
+  const snapshot = snapshotResult?.success ? snapshotResult.data : null;
+
+  const stats = snapshot?.stats ?? null;
+  const metrics = snapshot?.serverMetrics ?? [];
+  const requestsOverTime = snapshot?.requestsOverTime ?? [];
+  const responseOverTime = snapshot?.responseTimeOverTime ?? [];
+  const perServerData = snapshot?.requestsPerServer ?? [];
+  const healthData = snapshot?.healthDistribution ?? [];
+  const activeData = snapshot?.activeConnections ?? [];
+  const statsLoading = isLoading;
+  const metricsLoading = isLoading;
 
   return (
     <div className="min-h-screen bg-gray-50">

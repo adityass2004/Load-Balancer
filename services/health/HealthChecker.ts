@@ -16,7 +16,7 @@ class HealthChecker implements IHealthChecker {
       const response = await axios.get(targetUrl, {
         timeout: timeoutMs,
         validateStatus: () => true, // handle all status codes manually
-        headers: { 'User-Agent': 'TrackIt-HealthChecker/1.0' },
+        headers: { 'User-Agent': 'LoadBalancer-HealthChecker/1.0' },
       });
 
       const latencyMs = Date.now() - startTime;

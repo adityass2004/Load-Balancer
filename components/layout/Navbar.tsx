@@ -19,9 +19,9 @@ export function Navbar() {
       <div className="flex items-center gap-6">
         <Link href="/" className="flex items-center gap-2 font-bold text-lg tracking-tight text-gray-900">
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-gray-900 text-white text-xs font-bold">
-            TK
+            LB
           </span>
-          TrackIt
+          Load-Balancer
         </Link>
         <div className="flex items-center gap-1">
           {NAV_LINKS.map(({ href, label }) => {

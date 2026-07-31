@@ -85,20 +85,28 @@ class LoggingRepository {
 
   async getRequestsOverTime(hours = 24): Promise<{ timestamp: Date; count: number }[]> {
     try {
-      const since = new Date(Date.now() - hours * 3600_000);
+      const now = new Date();
+      const since = new Date(now.getTime() - hours * 3600_000);
       const logs = await db.requestLog.findMany({
         where: { createdAt: { gte: since } },
         select: { createdAt: true },
         orderBy: { createdAt: 'asc' },
       });
 
-      // Bucket by hour
       const buckets = new Map<string, number>();
+      for (let h = 0; h < hours; h++) {
+        const d = new Date(now.getTime() - (hours - 1 - h) * 3600_000);
+        d.setMinutes(0, 0, 0);
+        buckets.set(d.toISOString(), 0);
+      }
+
       for (const log of logs) {
         const hour = new Date(log.createdAt);
         hour.setMinutes(0, 0, 0);
         const key = hour.toISOString();
-        buckets.set(key, (buckets.get(key) ?? 0) + 1);
+        if (buckets.has(key)) {
+          buckets.set(key, (buckets.get(key) ?? 0) + 1);
+        }
       }
 
       return Array.from(buckets.entries()).map(([ts, count]) => ({
@@ -112,7 +120,8 @@ class LoggingRepository {
 
   async getResponseTimeOverTime(hours = 24): Promise<{ timestamp: Date; avgMs: number }[]> {
     try {
-      const since = new Date(Date.now() - hours * 3600_000);
+      const now = new Date();
+      const since = new Date(now.getTime() - hours * 3600_000);
       const logs = await db.requestLog.findMany({
         where: { createdAt: { gte: since }, responseTimeMs: { not: null } },
         select: { createdAt: true, responseTimeMs: true },
@@ -120,19 +129,25 @@ class LoggingRepository {
       });
 
       const buckets = new Map<string, number[]>();
+      for (let h = 0; h < hours; h++) {
+        const d = new Date(now.getTime() - (hours - 1 - h) * 3600_000);
+        d.setMinutes(0, 0, 0);
+        buckets.set(d.toISOString(), []);
+      }
+
       for (const log of logs) {
         if (log.responseTimeMs == null) continue;
         const hour = new Date(log.createdAt);
         hour.setMinutes(0, 0, 0);
         const key = hour.toISOString();
-        const arr = buckets.get(key) ?? [];
-        arr.push(log.responseTimeMs);
-        buckets.set(key, arr);
+        if (buckets.has(key)) {
+          buckets.get(key)!.push(log.responseTimeMs);
+        }
       }
 
       return Array.from(buckets.entries()).map(([ts, vals]) => ({
         timestamp: new Date(ts),
-        avgMs: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+        avgMs: vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0,
       }));
     } catch (e) {
       throw new DatabaseError(`getResponseTimeOverTime failed: ${(e as Error).message}`);

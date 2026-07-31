@@ -6,8 +6,6 @@ import { Algorithm, ServerHealth } from '@/types/domain';
 type ServerRuntimeState = {
   health: ServerHealth;
   activeRequests: number;
-  requestsHandled: number;
-  averageResponseTime: number;
   failureCount: number;
   lastHealthCheck: Date | null;
 };
@@ -15,8 +13,6 @@ type ServerRuntimeState = {
 const DEFAULT_RUNTIME = (): ServerRuntimeState => ({
   health: ServerHealth.UNKNOWN,
   activeRequests: 0,
-  requestsHandled: 0,
-  averageResponseTime: 0,
   failureCount: 0,
   lastHealthCheck: null,
 });
@@ -57,8 +53,6 @@ class CacheService {
     serverId: string,
     delta: {
       activeRequests?: number;
-      requestsHandled?: number;
-      latencyMs?: number;
       success?: boolean;
     }
   ): void {
@@ -67,18 +61,6 @@ class CacheService {
 
     if (delta.activeRequests !== undefined) {
       state.activeRequests = Math.max(0, state.activeRequests + delta.activeRequests);
-    }
-
-    if (delta.requestsHandled !== undefined) {
-      state.requestsHandled += delta.requestsHandled;
-    }
-
-    if (delta.latencyMs !== undefined && delta.success === true) {
-      const n = state.requestsHandled || 1;
-      state.averageResponseTime =
-        state.averageResponseTime === 0
-          ? delta.latencyMs
-          : (state.averageResponseTime * (n - 1) + delta.latencyMs) / n;
     }
 
     if (delta.success === true && state.health !== ServerHealth.UNHEALTHY) {
@@ -101,12 +83,6 @@ class CacheService {
     state.health = health;
     state.failureCount = failureCount;
     state.lastHealthCheck = checkedAt;
-
-    if (health === ServerHealth.HEALTHY && latencyMs !== null) {
-      const prev = state.averageResponseTime;
-      state.averageResponseTime =
-        prev === 0 ? latencyMs : Math.round(prev * 0.8 + latencyMs * 0.2);
-    }
     return true;
   }
 
@@ -194,9 +170,9 @@ class CacheService {
         ...server,
         healthy: effectiveHealth,
         activeRequests: state.activeRequests,
-        requestsHandled: state.requestsHandled,
-        averageResponseTime: state.averageResponseTime ?? server.averageResponseTime,
-        failureCount: state.failureCount,
+        requestsHandled: server.requestsHandled,
+        averageResponseTime: server.averageResponseTime,
+        failureCount: server.failureCount,
         lastHealthCheck: state.lastHealthCheck ?? server.lastHealthCheck,
       };
     });

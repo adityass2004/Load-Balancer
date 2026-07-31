@@ -2,6 +2,7 @@
 
 import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
 import {
+  getDashboardSnapshotAction,
   getDashboardStatsAction,
   getServerMetricsAction,
   getRequestsOverTimeAction,
@@ -16,18 +17,9 @@ import type {
   ServerMetric,
   ChartDataPoint,
   HealthDistributionItem,
+  CombinedDashboardData,
 } from '@/types/domain';
 import type { ActionResult } from '@/types/api';
-
-export interface CombinedDashboardData {
-  stats: DashboardStats | null;
-  serverMetrics: ServerMetric[];
-  requestsOverTime: ChartDataPoint[];
-  responseTimeOverTime: ChartDataPoint[];
-  requestsPerServer: ChartDataPoint[];
-  healthDistribution: HealthDistributionItem[];
-  activeConnections: ChartDataPoint[];
-}
 
 export const analyticsKeys = {
   all: ['analytics'] as const,
@@ -41,21 +33,13 @@ export const analyticsKeys = {
   activeConnections: () => [...analyticsKeys.all, 'activeConnections'] as const,
 };
 
-async function fetchDashboardData(): Promise<ActionResult<CombinedDashboardData>> {
-  const res = await fetch('/api/admin/dashboard');
-  if (!res.ok) {
-    throw new Error('Failed to fetch dashboard data');
-  }
-  return res.json();
-}
-
 export function useDashboardData(
   options?: Omit<UseQueryOptions<ActionResult<CombinedDashboardData>>, 'queryKey' | 'queryFn'>
 ) {
   const { refetchInterval } = useRefresh();
   return useQuery({
     queryKey: analyticsKeys.combined(),
-    queryFn: fetchDashboardData,
+    queryFn: getDashboardSnapshotAction,
     refetchInterval,
     refetchOnWindowFocus: false,
     staleTime: typeof refetchInterval === 'number' ? refetchInterval : Infinity,

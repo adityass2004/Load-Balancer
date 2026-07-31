@@ -9,6 +9,7 @@ import type {
   ServerMetric,
   ChartDataPoint,
   HealthDistributionItem,
+  CombinedDashboardData,
   Algorithm,
   Server,
 } from '@/types/domain';
@@ -33,7 +34,7 @@ const DEFAULT_SETTINGS = {
 class AnalyticsService {
   async getDashboardStats(): Promise<ActionResult<DashboardStats>> {
     const cacheKey = 'dashboard-stats';
-    const cached = globalCache.get<ActionResult<DashboardStats>>(cacheKey);
+    const cached = await globalCache.get<ActionResult<DashboardStats>>(cacheKey);
     if (cached) return cached;
 
     try {
@@ -80,7 +81,7 @@ class AnalyticsService {
         },
       };
 
-      globalCache.set(cacheKey, result, CACHE_TTL_MS);
+      await globalCache.set(cacheKey, result, CACHE_TTL_MS);
       return result;
     } catch (e) {
       return { success: false, error: toActionError(e) };
@@ -89,7 +90,7 @@ class AnalyticsService {
 
   async getServerMetrics(): Promise<ActionResult<ServerMetric[]>> {
     const cacheKey = 'server-metrics';
-    const cached = globalCache.get<ActionResult<ServerMetric[]>>(cacheKey);
+    const cached = await globalCache.get<ActionResult<ServerMetric[]>>(cacheKey);
     if (cached) return cached;
 
     try {
@@ -124,7 +125,7 @@ class AnalyticsService {
         });
 
       const result: ActionResult<ServerMetric[]> = { success: true, data: metrics };
-      globalCache.set(cacheKey, result, CACHE_TTL_MS);
+      await globalCache.set(cacheKey, result, CACHE_TTL_MS);
       return result;
     } catch (e) {
       return { success: false, error: toActionError(e) };
@@ -133,7 +134,7 @@ class AnalyticsService {
 
   async getRequestsOverTime(hours = 24): Promise<ActionResult<ChartDataPoint[]>> {
     const cacheKey = `requests-over-time-${hours}`;
-    const cached = globalCache.get<ActionResult<ChartDataPoint[]>>(cacheKey);
+    const cached = await globalCache.get<ActionResult<ChartDataPoint[]>>(cacheKey);
     if (cached) return cached;
 
     try {
@@ -143,7 +144,7 @@ class AnalyticsService {
         value: r.count,
       }));
       const result: ActionResult<ChartDataPoint[]> = { success: true, data };
-      globalCache.set(cacheKey, result, CACHE_TTL_MS);
+      await globalCache.set(cacheKey, result, CACHE_TTL_MS);
       return result;
     } catch (e) {
       return { success: false, error: toActionError(e) };
@@ -152,7 +153,7 @@ class AnalyticsService {
 
   async getResponseTimeOverTime(hours = 24): Promise<ActionResult<ChartDataPoint[]>> {
     const cacheKey = `response-time-over-time-${hours}`;
-    const cached = globalCache.get<ActionResult<ChartDataPoint[]>>(cacheKey);
+    const cached = await globalCache.get<ActionResult<ChartDataPoint[]>>(cacheKey);
     if (cached) return cached;
 
     try {
@@ -162,7 +163,7 @@ class AnalyticsService {
         value: r.avgMs,
       }));
       const result: ActionResult<ChartDataPoint[]> = { success: true, data };
-      globalCache.set(cacheKey, result, CACHE_TTL_MS);
+      await globalCache.set(cacheKey, result, CACHE_TTL_MS);
       return result;
     } catch (e) {
       return { success: false, error: toActionError(e) };
@@ -171,18 +172,23 @@ class AnalyticsService {
 
   async getRequestsPerServer(): Promise<ActionResult<ChartDataPoint[]>> {
     const cacheKey = 'requests-per-server';
-    const cached = globalCache.get<ActionResult<ChartDataPoint[]>>(cacheKey);
+    const cached = await globalCache.get<ActionResult<ChartDataPoint[]>>(cacheKey);
     if (cached) return cached;
 
     try {
-      const raw = await loggingRepository.getRequestsPerServer();
-      const data: ChartDataPoint[] = raw.map((r) => ({
+      const rawServers = await serverRepository.findMany({ includeDeleted: false });
+      await cacheService.refreshServers();
+      const servers = cacheService.mergeRuntimeState(rawServers);
+      const active = servers.filter((s) => !s.deletedAt);
+
+      const data: ChartDataPoint[] = active.map((s) => ({
         timestamp: '',
-        value: r.count,
-        label: r.backendUrl,
+        value: s.requestsHandled,
+        label: s.name || s.url,
       }));
+
       const result: ActionResult<ChartDataPoint[]> = { success: true, data };
-      globalCache.set(cacheKey, result, CACHE_TTL_MS);
+      await globalCache.set(cacheKey, result, CACHE_TTL_MS);
       return result;
     } catch (e) {
       return { success: false, error: toActionError(e) };
@@ -191,11 +197,13 @@ class AnalyticsService {
 
   async getHealthDistribution(): Promise<ActionResult<HealthDistributionItem[]>> {
     const cacheKey = 'health-distribution';
-    const cached = globalCache.get<ActionResult<HealthDistributionItem[]>>(cacheKey);
+    const cached = await globalCache.get<ActionResult<HealthDistributionItem[]>>(cacheKey);
     if (cached) return cached;
 
     try {
-      const servers = await serverRepository.findMany({ includeDeleted: false });
+      const rawServers = await serverRepository.findMany({ includeDeleted: false });
+      await cacheService.refreshServers();
+      const servers = cacheService.mergeRuntimeState(rawServers);
       const active = servers.filter((s) => !s.deletedAt);
 
       const healthy = active.filter((s) => s.healthy === ServerHealth.HEALTHY && s.enabled).length;
@@ -212,7 +220,7 @@ class AnalyticsService {
           { name: 'Disabled', value: disabled, color: '#6b7280' },
         ].filter((d) => d.value > 0),
       };
-      globalCache.set(cacheKey, result, CACHE_TTL_MS);
+      await globalCache.set(cacheKey, result, CACHE_TTL_MS);
       return result;
     } catch (e) {
       return { success: false, error: toActionError(e) };
@@ -221,35 +229,73 @@ class AnalyticsService {
 
   async getActiveConnectionsOverTime(hours = 1): Promise<ActionResult<ChartDataPoint[]>> {
     const cacheKey = `active-connections-${hours}`;
-    const cached = globalCache.get<ActionResult<ChartDataPoint[]>>(cacheKey);
+    const cached = await globalCache.get<ActionResult<ChartDataPoint[]>>(cacheKey);
     if (cached) return cached;
 
     try {
-      // Approximate from log timestamps in the last hour, grouped by 5-minute buckets
-      const since = new Date(Date.now() - hours * 3600_000);
-      const logs = await db.requestLog.findMany({
-        where: { createdAt: { gte: since }, statusCode: null }, // null = still in flight
-        select: { createdAt: true },
-        orderBy: { createdAt: 'asc' },
-      });
+      const rawServers = await serverRepository.findMany({ includeDeleted: false });
+      await cacheService.refreshServers();
+      const servers = cacheService.mergeRuntimeState(rawServers);
+      const active = servers.filter((s) => !s.deletedAt && s.enabled);
 
-      // For active connections we use the server table
-      const servers = await serverRepository.findMany({ includeDeleted: false });
-      const active = servers.filter((s) => !s.deletedAt);
-
-      // Build a single current snapshot point
       const totalActive = active.reduce((sum, s) => sum + s.activeRequests, 0);
       const now = new Date();
+
       const data: ChartDataPoint[] = [
         {
           timestamp: new Date(now.getTime() - 60_000).toISOString(),
-          value: Math.max(0, totalActive - Math.floor(Math.random() * 2)),
+          value: totalActive,
         },
         { timestamp: now.toISOString(), value: totalActive },
       ];
 
       const result: ActionResult<ChartDataPoint[]> = { success: true, data };
-      globalCache.set(cacheKey, result, CACHE_TTL_MS);
+      await globalCache.set(cacheKey, result, CACHE_TTL_MS);
+      return result;
+    } catch (e) {
+      return { success: false, error: toActionError(e) };
+    }
+  }
+
+  async getDashboardSnapshot(): Promise<ActionResult<CombinedDashboardData>> {
+    const cacheKey = 'dashboard-snapshot';
+    const cached = await globalCache.get<ActionResult<CombinedDashboardData>>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const [
+        statsRes,
+        serverMetricsRes,
+        reqOverTimeRes,
+        respOverTimeRes,
+        perServerRes,
+        healthDistRes,
+        activeConnRes,
+      ] = await Promise.all([
+        this.getDashboardStats(),
+        this.getServerMetrics(),
+        this.getRequestsOverTime(24),
+        this.getResponseTimeOverTime(24),
+        this.getRequestsPerServer(),
+        this.getHealthDistribution(),
+        this.getActiveConnectionsOverTime(),
+      ]);
+
+      const result: ActionResult<CombinedDashboardData> = {
+        success: true,
+        data: {
+          stats: statsRes.success ? statsRes.data : null,
+          serverMetrics: serverMetricsRes.success ? serverMetricsRes.data : [],
+          requestsOverTime: reqOverTimeRes.success ? reqOverTimeRes.data : [],
+          responseTimeOverTime: respOverTimeRes.success ? respOverTimeRes.data : [],
+          requestsPerServer: perServerRes.success ? perServerRes.data : [],
+          healthDistribution: healthDistRes.success ? healthDistRes.data : [],
+          activeConnections: activeConnRes.success ? activeConnRes.data : [],
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      await globalCache.set(cacheKey, result, 2000);
       return result;
     } catch (e) {
       return { success: false, error: toActionError(e) };

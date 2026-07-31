@@ -1,14 +1,14 @@
 {
-  "name": "trackit-load-balancer",
+  "name": "load-balancer",
   "version": "1.0.0",
   "private": true,
   "engines": {
     "node": "22"
   },
   "scripts": {
-    "dev": "next dev -p 8000",
+    "dev": "next dev",
     "build": "prisma generate && next build",
-    "start": "next start -p 8000",
+    "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",

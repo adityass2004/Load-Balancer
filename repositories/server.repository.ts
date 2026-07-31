@@ -193,6 +193,66 @@ class ServerRepository implements IRepository<Server, CreateServerInput, UpdateS
     }
   }
 
+  async updateAverageResponseTime(id: string, latencyMs: number): Promise<Server> {
+    try {
+      const server = await db.server.findUnique({
+        where: { id },
+        select: { averageResponseTime: true },
+      });
+      const prev = server?.averageResponseTime ?? 0;
+      const newAvg = prev === 0 ? latencyMs : Math.round(prev * 0.9 + latencyMs * 0.1);
+
+      return await db.server.update({
+        where: { id },
+        data: { averageResponseTime: newAvg },
+      });
+    } catch (e) {
+      throw new DatabaseError(`updateAverageResponseTime failed: ${(e as Error).message}`);
+    }
+  }
+
+  async incrementFailureCount(id: string): Promise<Server> {
+    try {
+      return await db.server.update({
+        where: { id },
+        data: { failureCount: { increment: 1 } },
+      });
+    } catch (e) {
+      throw new DatabaseError(`incrementFailureCount failed: ${(e as Error).message}`);
+    }
+  }
+
+  async recordRequestCompletion(
+    id: string,
+    options: { latencyMs?: number; success: boolean }
+  ): Promise<Server> {
+    try {
+      const server = await db.server.findUnique({
+        where: { id },
+        select: { averageResponseTime: true },
+      });
+
+      const prevAvg = server?.averageResponseTime ?? 0;
+      const newAvg =
+        options.success && options.latencyMs && options.latencyMs > 0
+          ? prevAvg === 0
+            ? options.latencyMs
+            : Math.round(prevAvg * 0.9 + options.latencyMs * 0.1)
+          : prevAvg;
+
+      return await db.server.update({
+        where: { id },
+        data: {
+          activeRequests: { decrement: 1 },
+          averageResponseTime: newAvg,
+          ...(options.success ? {} : { failureCount: { increment: 1 } }),
+        },
+      });
+    } catch (e) {
+      throw new DatabaseError(`recordRequestCompletion failed: ${(e as Error).message}`);
+    }
+  }
+
   // Hard delete — only used internally or for test cleanup
   async delete(id: string): Promise<void> {
     try {

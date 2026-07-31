@@ -32,8 +32,8 @@ export function RefreshProvider({ children }: { children: ReactNode }) {
   const [intervalMs, setIntervalMsState] = useState(30_000);
 
   React.useEffect(() => {
-    const savedEnabled = localStorage.getItem('trackit-refresh-enabled');
-    const savedInterval = localStorage.getItem('trackit-refresh-interval');
+    const savedEnabled = localStorage.getItem('load-balancer-refresh-enabled');
+    const savedInterval = localStorage.getItem('load-balancer-refresh-interval');
     if (savedEnabled !== null) {
       setEnabledState(savedEnabled === 'true');
     }
@@ -44,18 +44,18 @@ export function RefreshProvider({ children }: { children: ReactNode }) {
 
   const setEnabled = useCallback((v: boolean) => {
     setEnabledState(v);
-    localStorage.setItem('trackit-refresh-enabled', String(v));
+    localStorage.setItem('load-balancer-refresh-enabled', String(v));
   }, []);
 
   const setIntervalMs = useCallback((v: number) => {
     setIntervalMsState(v);
-    localStorage.setItem('trackit-refresh-interval', String(v));
+    localStorage.setItem('load-balancer-refresh-interval', String(v));
   }, []);
 
   const toggle = useCallback(() => {
     setEnabledState((v) => {
       const next = !v;
-      localStorage.setItem('trackit-refresh-enabled', String(next));
+      localStorage.setItem('load-balancer-refresh-enabled', String(next));
       return next;
     });
   }, []);

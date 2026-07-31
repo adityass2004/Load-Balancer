@@ -10,22 +10,11 @@ class HealthRepository implements IHealthRepository {
     checkedAt: Date
   ): Promise<void> {
     try {
-      // Compute rolling average: (prev * 0.8) + (new * 0.2)
-      const server = await prisma.server.findUnique({
-        where: { id: serverId },
-        select: { averageResponseTime: true },
-      });
-
-      const prev = server?.averageResponseTime ?? 0;
-      const avg = prev === 0 ? latencyMs : prev * 0.8 + latencyMs * 0.2;
-
       await prisma.server.update({
         where: { id: serverId },
         data: {
           healthy: ServerHealth.HEALTHY,
-          failureCount: 0,
           lastHealthCheck: checkedAt,
-          averageResponseTime: Math.round(avg),
         },
       });
     } catch (e) {
