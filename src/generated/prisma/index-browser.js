@@ -120,44 +120,19 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
   Serializable: 'Serializable'
 });
 
-exports.Prisma.App_installsScalarFieldEnum = {
+exports.Prisma.ProjectScalarFieldEnum = {
   id: 'id',
-  user_id: 'user_id',
-  device_id: 'device_id',
-  platform: 'platform',
-  app_version: 'app_version',
-  installed_at: 'installed_at',
-  last_active: 'last_active'
-};
-
-exports.Prisma.Reminder_contentScalarFieldEnum = {
-  id: 'id',
-  reminder_user_id: 'reminder_user_id',
-  title: 'title',
+  name: 'name',
+  slug: 'slug',
   description: 'description',
-  remind_at: 'remind_at',
-  status: 'status',
-  created_at: 'created_at',
-  updated_at: 'updated_at'
-};
-
-exports.Prisma.Reminder_usersScalarFieldEnum = {
-  id: 'id',
-  user_id: 'user_id',
-  max_reminders: 'max_reminders',
-  created_at: 'created_at'
-};
-
-exports.Prisma.UsersScalarFieldEnum = {
-  id: 'id',
-  external_id: 'external_id',
-  created_at: 'created_at',
-  last_login_at: 'last_login_at',
-  login_count: 'login_count'
+  enabled: 'enabled',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.ServerScalarFieldEnum = {
   id: 'id',
+  projectId: 'projectId',
   name: 'name',
   url: 'url',
   enabled: 'enabled',
@@ -176,6 +151,7 @@ exports.Prisma.ServerScalarFieldEnum = {
 
 exports.Prisma.SettingsScalarFieldEnum = {
   id: 'id',
+  projectId: 'projectId',
   algorithm: 'algorithm',
   healthCheckInterval: 'healthCheckInterval',
   healthCheckTimeout: 'healthCheckTimeout',
@@ -189,6 +165,7 @@ exports.Prisma.SettingsScalarFieldEnum = {
 
 exports.Prisma.RequestLogScalarFieldEnum = {
   id: 'id',
+  projectId: 'projectId',
   requestId: 'requestId',
   method: 'method',
   route: 'route',
@@ -215,12 +192,6 @@ exports.Prisma.NullsOrder = {
   first: 'first',
   last: 'last'
 };
-exports.ReminderStatus = exports.$Enums.ReminderStatus = {
-  PENDING: 'PENDING',
-  COMPLETED: 'COMPLETED',
-  CANCELLED: 'CANCELLED'
-};
-
 exports.ServerHealth = exports.$Enums.ServerHealth = {
   HEALTHY: 'HEALTHY',
   UNHEALTHY: 'UNHEALTHY',
@@ -247,10 +218,7 @@ exports.HttpMethod = exports.$Enums.HttpMethod = {
 };
 
 exports.Prisma.ModelName = {
-  app_installs: 'app_installs',
-  reminder_content: 'reminder_content',
-  reminder_users: 'reminder_users',
-  users: 'users',
+  Project: 'Project',
   Server: 'Server',
   Settings: 'Settings',
   RequestLog: 'RequestLog'

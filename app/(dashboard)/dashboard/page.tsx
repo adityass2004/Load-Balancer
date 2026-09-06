@@ -29,6 +29,7 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 }
 
 import { useRefresh } from '@/context/RefreshContext';
+import { useProject } from '@/context/ProjectContext';
 
 function LiveIndicator() {
   const { enabled, intervalMs } = useRefresh();
@@ -54,7 +55,8 @@ function LiveIndicator() {
 }
 
 export default function DashboardPage() {
-  const { data: snapshotResult, isLoading } = useDashboardData();
+  const { selectedProjectId, selectedProject } = useProject();
+  const { data: snapshotResult, isLoading } = useDashboardData(selectedProjectId ?? undefined);
 
   const snapshot = snapshotResult?.success ? snapshotResult.data : null;
 

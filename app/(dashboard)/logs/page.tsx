@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { useLogs } from '@/hooks/useLogs';
+import { useProject } from '@/context/ProjectContext';
 import { getAllLogsForExportAction } from '@/actions/logs.actions';
 import type { LogQueryParams } from '@/services/logging/LoggingRepository';
 import type { RequestLog, HttpMethod } from '@/types/domain';
@@ -111,6 +112,7 @@ function Pagination({
 const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
 export default function LogsPage() {
+  const { selectedProjectId } = useProject();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [method, setMethod] = useState<HttpMethod | ''>('');
@@ -121,6 +123,7 @@ export default function LogsPage() {
 
   const params: LogQueryParams = useMemo(
     () => ({
+      projectId: selectedProjectId ?? undefined,
       page,
       pageSize: 50,
       search: search || undefined,
@@ -129,7 +132,7 @@ export default function LogsPage() {
       dateFrom: dateFrom ? new Date(dateFrom) : undefined,
       dateTo: dateTo ? new Date(dateTo) : undefined,
     }),
-    [page, search, method, statusCategory, dateFrom, dateTo]
+    [selectedProjectId, page, search, method, statusCategory, dateFrom, dateTo]
   );
 
   const {

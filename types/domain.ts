@@ -4,10 +4,23 @@ import { Algorithm, ServerHealth, HttpMethod } from '@/src/generated/prisma';
 
 export { Algorithm, ServerHealth, HttpMethod };
 
+// ─── Project ───────────────────────────────────────────────────────────────────
+
+export type Project = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 // ─── Server ────────────────────────────────────────────────────────────────────
 
 export type Server = {
   id: string;
+  projectId?: string | null;
   name: string;
   url: string;
   enabled: boolean;
@@ -34,6 +47,7 @@ export type ServerSummary = Pick<
 
 export type Settings = {
   id: string;
+  projectId?: string | null;
   algorithm: Algorithm;
   healthCheckInterval: number;
   healthCheckTimeout: number;
@@ -49,6 +63,7 @@ export type Settings = {
 
 export type RequestLog = {
   id: string;
+  projectId?: string | null;
   requestId: string;
   method: HttpMethod;
   route: string;

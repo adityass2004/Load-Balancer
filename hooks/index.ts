@@ -23,3 +23,5 @@ export {
 } from './useAnalytics';
 
 export { useLogs, logKeys } from './useLogs';
+export * from './useProjects';
+

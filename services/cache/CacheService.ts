@@ -1,6 +1,7 @@
+import { projectRepository } from '@/repositories/project.repository';
 import { serverRepository } from '@/repositories/server.repository';
 import { settingsRepository } from '@/repositories/settings.repository';
-import type { Server, Settings } from '@/types/domain';
+import type { Project, Server, Settings } from '@/types/domain';
 import { Algorithm, ServerHealth } from '@/types/domain';
 
 type ServerRuntimeState = {
@@ -18,14 +19,18 @@ const DEFAULT_RUNTIME = (): ServerRuntimeState => ({
 });
 
 class CacheService {
-  private servers: Server[] | null = null;
-  private settings: Settings | null = null;
+  private projectsById: Map<string, Project> = new Map();
+  private projectsBySlug: Map<string, Project> = new Map();
+  private serversByProject: Map<string, Server[]> = new Map();
+  private settingsByProject: Map<string, Settings> = new Map();
   private runtimeState: Map<string, ServerRuntimeState> = new Map();
 
+  private isFetchingProjects = false;
   private isFetchingServers = false;
   private isFetchingSettings = false;
 
-  private readonly DEFAULT_SETTINGS = {
+  private readonly DEFAULT_SETTINGS: Omit<Settings, 'id' | 'createdAt' | 'updatedAt'> = {
+    projectId: null,
     algorithm: Algorithm.WEIGHTED_ROUND_ROBIN,
     healthCheckInterval: 30,
     healthCheckTimeout: 5,
@@ -35,18 +40,63 @@ class CacheService {
     maxRetries: 3,
   };
 
-  async getServers(): Promise<Server[]> {
-    if (this.servers === null) {
+  async resolveProject(identifier: string): Promise<Project | null> {
+    if (this.projectsById.size === 0 && this.projectsBySlug.size === 0) {
+      await this.refreshProjects();
+    }
+
+    let project = this.projectsById.get(identifier) || this.projectsBySlug.get(identifier) || null;
+    if (!project) {
+      await this.refreshProjects();
+      project = this.projectsById.get(identifier) || this.projectsBySlug.get(identifier) || null;
+    }
+
+    return project;
+  }
+
+  async getServersForProject(projectId: string): Promise<Server[]> {
+    if (!this.serversByProject.has(projectId)) {
       await this.refreshServers();
     }
-    return this.mergeRuntimeState(this.servers || []);
+    const servers = (this.serversByProject.get(projectId) || [])
+      .filter((server) => server.projectId === projectId);
+    return this.mergeRuntimeState(servers);
+  }
+
+  async getSettingsForProject(projectId: string): Promise<Settings> {
+    if (!this.settingsByProject.has(projectId)) {
+      await this.refreshSettingsForProject(projectId);
+    }
+    return this.settingsByProject.get(projectId) || ({
+      ...this.DEFAULT_SETTINGS,
+      id: crypto.randomUUID(),
+      projectId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Settings);
+  }
+
+  async getServers(): Promise<Server[]> {
+    if (this.serversByProject.size === 0) {
+      await this.refreshServers();
+    }
+    const allServers = Array.from(this.serversByProject.values()).flat();
+    return this.mergeRuntimeState(allServers);
   }
 
   async getSettings(): Promise<Settings> {
-    if (this.settings === null) {
-      await this.refreshSettings();
+    if (this.settingsByProject.size > 0) {
+      const first = this.settingsByProject.values().next().value;
+      if (first) return first;
     }
-    return this.settings || (this.DEFAULT_SETTINGS as unknown as Settings);
+    await this.refreshSettings();
+    const first = this.settingsByProject.values().next().value;
+    return first || ({
+      ...this.DEFAULT_SETTINGS,
+      id: crypto.randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Settings);
   }
 
   updateRuntimeMetrics(
@@ -110,6 +160,28 @@ class CacheService {
     this.runtimeState.delete(serverId);
   }
 
+  async refreshProjects(): Promise<void> {
+    if (this.isFetchingProjects) return;
+    this.isFetchingProjects = true;
+    try {
+      const projects = await projectRepository.findMany({}, { page: 1, pageSize: 100 });
+      const newById = new Map<string, Project>();
+      const newBySlug = new Map<string, Project>();
+
+      for (const proj of projects) {
+        newById.set(proj.id, proj);
+        newBySlug.set(proj.slug, proj);
+      }
+
+      this.projectsById = newById;
+      this.projectsBySlug = newBySlug;
+    } catch (e) {
+      console.error('[CACHE] Failed to refresh projects:', (e as Error).message);
+    } finally {
+      this.isFetchingProjects = false;
+    }
+  }
+
   async refreshServers(): Promise<void> {
     if (this.isFetchingServers) return;
     this.isFetchingServers = true;
@@ -121,16 +193,25 @@ class CacheService {
         if (!enabledIds.has(id)) this.runtimeState.delete(id);
       }
 
+      const grouped = new Map<string, Server[]>();
       let inited = 0;
+
       for (const server of newServers) {
         if (!this.runtimeState.has(server.id)) {
           this.runtimeState.set(server.id, DEFAULT_RUNTIME());
           inited += 1;
         }
+        const pKey = server.projectId || 'unassigned';
+        const list = grouped.get(pKey) || [];
+        list.push(server);
+        grouped.set(pKey, list);
       }
-      if (inited > 0) console.log(`[CACHE refreshServers] loaded ${newServers.length} enabled, ${inited} new runtime entries`);
 
-      this.servers = newServers;
+      if (inited > 0) {
+        console.log(`[CACHE refreshServers] loaded ${newServers.length} enabled across ${grouped.size} project groups, ${inited} new runtime entries`);
+      }
+
+      this.serversByProject = grouped;
     } catch (e) {
       console.error('[CACHE] Failed to refresh servers:', (e as Error).message);
     } finally {
@@ -138,21 +219,32 @@ class CacheService {
     }
   }
 
+  async refreshSettingsForProject(projectId: string): Promise<void> {
+    try {
+      const settings = await settingsRepository.getOrCreate(this.DEFAULT_SETTINGS, projectId);
+      this.settingsByProject.set(projectId, settings);
+    } catch (e) {
+      console.error(`[CACHE] Failed to refresh settings for project ${projectId}:`, (e as Error).message);
+    }
+  }
+
   async refreshSettings(): Promise<void> {
     if (this.isFetchingSettings) return;
     this.isFetchingSettings = true;
     try {
-      const newSettings = await settingsRepository.getOrCreate(this.DEFAULT_SETTINGS);
-      this.settings = newSettings;
+      await this.refreshProjects();
+      for (const projectId of this.projectsById.keys()) {
+        await this.refreshSettingsForProject(projectId);
+      }
     } catch (e) {
-      console.error('[CACHE] Failed to refresh settings — keeping previous cache:', (e as Error).message);
+      console.error('[CACHE] Failed to refresh settings:', (e as Error).message);
     } finally {
       this.isFetchingSettings = false;
     }
   }
 
   async refreshAll(): Promise<void> {
-    await Promise.all([this.refreshServers(), this.refreshSettings()]);
+    await Promise.all([this.refreshProjects(), this.refreshServers(), this.refreshSettings()]);
   }
 
   mergeRuntimeState(servers: Server[]): Server[] {
@@ -172,7 +264,7 @@ class CacheService {
         activeRequests: state.activeRequests,
         requestsHandled: server.requestsHandled,
         averageResponseTime: server.averageResponseTime,
-        failureCount: server.failureCount,
+        failureCount: state.failureCount,
         lastHealthCheck: state.lastHealthCheck ?? server.lastHealthCheck,
       };
     });

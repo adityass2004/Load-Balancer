@@ -36,9 +36,9 @@ export const serverService = {
     }
   },
 
-  async getEnabled(): Promise<ActionResult<Server[]>> {
+  async getEnabled(projectId?: string): Promise<ActionResult<Server[]>> {
     try {
-      const data = await serverRepository.findEnabled();
+      const data = await serverRepository.findEnabled(projectId);
       await cacheService.refreshServers();
       const merged = cacheService.mergeRuntimeState(data);
       return ok(merged);
@@ -49,8 +49,13 @@ export const serverService = {
 
   async create(input: CreateServerInput): Promise<ActionResult<Server>> {
     try {
-      const existing = await serverRepository.findByUrl(input.url);
-      if (existing) throw new ConflictError(`A server with URL "${input.url}" already exists`);
+      const projectId = input.projectId ?? null;
+      const existing = await serverRepository.findByUrlAndProject(input.url, projectId);
+      if (existing) {
+        throw new ConflictError(
+          `A server with URL "${input.url}" already exists in this project`
+        );
+      }
 
       const data = await serverRepository.create(input);
       return ok(data);
@@ -61,13 +66,16 @@ export const serverService = {
 
   async update(id: string, input: UpdateServerInput): Promise<ActionResult<Server>> {
     try {
-      await serverRepository.findActiveByIdOrThrow(id);
+      const current = await serverRepository.findActiveByIdOrThrow(id);
+      const projectId =
+        input.projectId !== undefined ? input.projectId ?? null : current.projectId ?? null;
+      const url = input.url ?? current.url;
 
-      if (input.url) {
-        const existing = await serverRepository.findByUrl(input.url);
-        if (existing && existing.id !== id) {
-          throw new ConflictError(`A server with URL "${input.url}" already exists`);
-        }
+      const existing = await serverRepository.findByUrlAndProject(url, projectId, id);
+      if (existing) {
+        throw new ConflictError(
+          `A server with URL "${url}" already exists in this project`
+        );
       }
 
       const data = await serverRepository.update(id, input);

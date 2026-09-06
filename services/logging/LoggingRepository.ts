@@ -3,6 +3,7 @@ import { DatabaseError } from '@/lib/errors';
 import type { RequestLog, HttpMethod } from '@/types/domain';
 
 export type LogFilters = {
+  projectId?: string;
   serverId?: string;
   backendId?: string;
   method?: HttpMethod;
@@ -21,6 +22,7 @@ export type LogQueryParams = LogFilters & {
 
 class LoggingRepository {
   async create(data: {
+    projectId?: string | null;
     requestId: string;
     method: HttpMethod;
     route: string;
@@ -72,23 +74,29 @@ class LoggingRepository {
     }
   }
 
-  async getRecentRequestsPerMinute(): Promise<number> {
+  async getRecentRequestsPerMinute(projectId?: string): Promise<number> {
     try {
       const oneMinuteAgo = new Date(Date.now() - 60_000);
       return await db.requestLog.count({
-        where: { createdAt: { gte: oneMinuteAgo } },
+        where: {
+          createdAt: { gte: oneMinuteAgo },
+          ...(projectId ? { projectId } : {}),
+        },
       });
     } catch (e) {
       throw new DatabaseError(`LoggingRepository.getRecentRequestsPerMinute failed: ${(e as Error).message}`);
     }
   }
 
-  async getRequestsOverTime(hours = 24): Promise<{ timestamp: Date; count: number }[]> {
+  async getRequestsOverTime(hours = 24, projectId?: string): Promise<{ timestamp: Date; count: number }[]> {
     try {
       const now = new Date();
       const since = new Date(now.getTime() - hours * 3600_000);
       const logs = await db.requestLog.findMany({
-        where: { createdAt: { gte: since } },
+        where: {
+          createdAt: { gte: since },
+          ...(projectId ? { projectId } : {}),
+        },
         select: { createdAt: true },
         orderBy: { createdAt: 'asc' },
       });
@@ -118,12 +126,16 @@ class LoggingRepository {
     }
   }
 
-  async getResponseTimeOverTime(hours = 24): Promise<{ timestamp: Date; avgMs: number }[]> {
+  async getResponseTimeOverTime(hours = 24, projectId?: string): Promise<{ timestamp: Date; avgMs: number }[]> {
     try {
       const now = new Date();
       const since = new Date(now.getTime() - hours * 3600_000);
       const logs = await db.requestLog.findMany({
-        where: { createdAt: { gte: since }, responseTimeMs: { not: null } },
+        where: {
+          createdAt: { gte: since },
+          responseTimeMs: { not: null },
+          ...(projectId ? { projectId } : {}),
+        },
         select: { createdAt: true, responseTimeMs: true },
         orderBy: { createdAt: 'asc' },
       });
@@ -172,6 +184,8 @@ class LoggingRepository {
 
   private buildWhere(filters: LogFilters) {
     const where: Record<string, unknown> = {};
+
+    if (filters.projectId) where.projectId = filters.projectId;
 
     if (filters.backendId) where.backendId = filters.backendId;
 

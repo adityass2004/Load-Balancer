@@ -1,16 +1,31 @@
 import axios from 'axios';
 import { Server } from '@/types/domain';
 
-export class RequestForwarder {
-  async forward(server: Server, request: Request, timeoutMs: number): Promise<Response> {
-    const incomingUrl = new URL(request.url);
-    const backendUrl = new URL(server.url);
+export function buildUpstreamUrl(serverUrl: string, backendPath: string): string {
+  const incomingUrl = new URL(backendPath, 'http://proxy.internal');
+  const backendUrl = new URL(serverUrl);
 
-    // Build target URL respecting subpaths
-    const backendPath = backendUrl.pathname.replace(/\/$/, '');
-    const incomingPath = incomingUrl.pathname;
-    const targetPath = `${backendPath}${incomingPath}`;
-    const targetUrl = `${backendUrl.protocol}//${backendUrl.host}${targetPath}${incomingUrl.search}`;
+  // Parse only the caller-provided backend path. The synthetic base is used
+  // for relative URL parsing and is never used as the upstream origin.
+  const backendBasePath = backendUrl.pathname.replace(/\/+$/, '');
+  const incomingPath = incomingUrl.pathname.startsWith('/')
+    ? incomingUrl.pathname
+    : `/${incomingUrl.pathname}`;
+  backendUrl.pathname = `${backendBasePath}${incomingPath}` || '/';
+  backendUrl.search = incomingUrl.search;
+  backendUrl.hash = '';
+
+  return backendUrl.toString();
+}
+
+export class RequestForwarder {
+  async forward(
+    server: Server,
+    request: Request,
+    timeoutMs: number,
+    backendPath: string
+  ): Promise<Response> {
+    const targetUrl = buildUpstreamUrl(server.url, backendPath);
 
     // Copy all headers except host to avoid proxy target host header issues
     const headers: Record<string, string> = {};

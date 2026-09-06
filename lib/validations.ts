@@ -4,6 +4,7 @@ import { Algorithm, ServerHealth } from '@/src/generated/prisma';
 // ─── Server ────────────────────────────────────────────────────────────────────
 
 export const createServerSchema = z.object({
+  projectId: z.string().uuid().optional().nullable(),
   name: z.string().min(1, 'Name is required').max(100, 'Name must be 100 characters or less'),
   url: z
     .string()
@@ -32,6 +33,7 @@ export const serverStatsSchema = z.object({
 });
 
 export const serverQuerySchema = z.object({
+  projectId: z.string().uuid().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().optional(),
@@ -66,6 +68,7 @@ export type HealthCheckResultInput = z.infer<typeof healthCheckResultSchema>;
 // ─── Settings ───────────────────────────────────────────────────────────────
 
 export const createSettingsSchema = z.object({
+  projectId: z.string().uuid().optional().nullable(),
   algorithm: z.nativeEnum(Algorithm).default(Algorithm.ROUND_ROBIN),
   healthCheckInterval: z.number().int().min(5).max(300).default(30),
   healthCheckTimeout: z.number().int().min(1).max(60).default(5),
@@ -79,4 +82,32 @@ export const updateSettingsSchema = createSettingsSchema.partial();
 
 export type CreateSettingsInput = z.infer<typeof createSettingsSchema>;
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
+
+// ─── Project ─────────────────────────────────────────────────────────────────
+
+export const createProjectSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name must be 100 characters or less'),
+  slug: z
+    .string()
+    .min(1, 'Slug is required')
+    .max(100, 'Slug must be 100 characters or less')
+    .regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
+  description: z.string().max(500, 'Description must be 500 characters or less').optional().nullable(),
+  enabled: z.boolean().default(true),
+});
+
+export const updateProjectSchema = createProjectSchema.partial();
+
+export const projectQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().optional(),
+  enabled: z.coerce.boolean().optional(),
+  sortField: z.enum(['name', 'slug', 'createdAt', 'updatedAt']).default('createdAt'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export type CreateProjectInput = z.infer<typeof createProjectSchema>;
+export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+export type ProjectQueryInput = z.infer<typeof projectQuerySchema>;
 

@@ -32,18 +32,23 @@ const DEFAULT_SETTINGS = {
 };
 
 class AnalyticsService {
-  async getDashboardStats(): Promise<ActionResult<DashboardStats>> {
-    const cacheKey = 'dashboard-stats';
+  async getDashboardStats(projectId?: string): Promise<ActionResult<DashboardStats>> {
+    const cacheKey = `dashboard-stats-${projectId ?? 'all'}`;
     const cached = await globalCache.get<ActionResult<DashboardStats>>(cacheKey);
     if (cached) return cached;
 
     try {
-      const rawServers = await serverRepository.findMany({ includeDeleted: false });
+      const rawServers = await serverRepository.findMany({
+        includeDeleted: false,
+        ...(projectId ? { projectId } : {}),
+      });
       await cacheService.refreshServers();
       const servers = cacheService.mergeRuntimeState(rawServers);
-      const settings = await settingsRepository.getOrCreate(DEFAULT_SETTINGS);
-      const totalRequestsInDb = await db.requestLog.count();
-      const requestsPerMinute = await loggingRepository.getRecentRequestsPerMinute();
+      const settings = await settingsRepository.getOrCreate(DEFAULT_SETTINGS, projectId);
+      const totalRequestsInDb = await db.requestLog.count({
+        where: projectId ? { projectId } : {},
+      });
+      const requestsPerMinute = await loggingRepository.getRecentRequestsPerMinute(projectId);
 
       const activeServers = servers.filter((s: Server) => !s.deletedAt);
       const healthyServers = activeServers.filter((s: Server) => s.healthy === ServerHealth.HEALTHY && s.enabled).length;
@@ -51,7 +56,6 @@ class AnalyticsService {
       const disabledServers = activeServers.filter((s: Server) => !s.enabled).length;
       const activeRequests = activeServers.reduce((sum: number, s: Server) => sum + s.activeRequests, 0);
 
-      // Include in-memory runtime handled requests sum with DB logs count
       const runtimeHandledSum = activeServers.reduce((sum: number, s: Server) => sum + s.requestsHandled, 0);
       const totalRequests = Math.max(totalRequestsInDb, runtimeHandledSum);
 
@@ -88,13 +92,16 @@ class AnalyticsService {
     }
   }
 
-  async getServerMetrics(): Promise<ActionResult<ServerMetric[]>> {
-    const cacheKey = 'server-metrics';
+  async getServerMetrics(projectId?: string): Promise<ActionResult<ServerMetric[]>> {
+    const cacheKey = `server-metrics-${projectId ?? 'all'}`;
     const cached = await globalCache.get<ActionResult<ServerMetric[]>>(cacheKey);
     if (cached) return cached;
 
     try {
-      const rawServers = await serverRepository.findMany({ includeDeleted: false });
+      const rawServers = await serverRepository.findMany({
+        includeDeleted: false,
+        ...(projectId ? { projectId } : {}),
+      });
       await cacheService.refreshServers();
       const servers = cacheService.mergeRuntimeState(rawServers);
       const metrics: ServerMetric[] = servers
@@ -132,13 +139,13 @@ class AnalyticsService {
     }
   }
 
-  async getRequestsOverTime(hours = 24): Promise<ActionResult<ChartDataPoint[]>> {
-    const cacheKey = `requests-over-time-${hours}`;
+  async getRequestsOverTime(hours = 24, projectId?: string): Promise<ActionResult<ChartDataPoint[]>> {
+    const cacheKey = `requests-over-time-${hours}-${projectId ?? 'all'}`;
     const cached = await globalCache.get<ActionResult<ChartDataPoint[]>>(cacheKey);
     if (cached) return cached;
 
     try {
-      const raw = await loggingRepository.getRequestsOverTime(hours);
+      const raw = await loggingRepository.getRequestsOverTime(hours, projectId);
       const data: ChartDataPoint[] = raw.map((r) => ({
         timestamp: r.timestamp.toISOString(),
         value: r.count,
@@ -151,13 +158,13 @@ class AnalyticsService {
     }
   }
 
-  async getResponseTimeOverTime(hours = 24): Promise<ActionResult<ChartDataPoint[]>> {
-    const cacheKey = `response-time-over-time-${hours}`;
+  async getResponseTimeOverTime(hours = 24, projectId?: string): Promise<ActionResult<ChartDataPoint[]>> {
+    const cacheKey = `response-time-over-time-${hours}-${projectId ?? 'all'}`;
     const cached = await globalCache.get<ActionResult<ChartDataPoint[]>>(cacheKey);
     if (cached) return cached;
 
     try {
-      const raw = await loggingRepository.getResponseTimeOverTime(hours);
+      const raw = await loggingRepository.getResponseTimeOverTime(hours, projectId);
       const data: ChartDataPoint[] = raw.map((r) => ({
         timestamp: r.timestamp.toISOString(),
         value: r.avgMs,
@@ -170,13 +177,16 @@ class AnalyticsService {
     }
   }
 
-  async getRequestsPerServer(): Promise<ActionResult<ChartDataPoint[]>> {
-    const cacheKey = 'requests-per-server';
+  async getRequestsPerServer(projectId?: string): Promise<ActionResult<ChartDataPoint[]>> {
+    const cacheKey = `requests-per-server-${projectId ?? 'all'}`;
     const cached = await globalCache.get<ActionResult<ChartDataPoint[]>>(cacheKey);
     if (cached) return cached;
 
     try {
-      const rawServers = await serverRepository.findMany({ includeDeleted: false });
+      const rawServers = await serverRepository.findMany({
+        includeDeleted: false,
+        ...(projectId ? { projectId } : {}),
+      });
       await cacheService.refreshServers();
       const servers = cacheService.mergeRuntimeState(rawServers);
       const active = servers.filter((s) => !s.deletedAt);
@@ -195,13 +205,16 @@ class AnalyticsService {
     }
   }
 
-  async getHealthDistribution(): Promise<ActionResult<HealthDistributionItem[]>> {
-    const cacheKey = 'health-distribution';
+  async getHealthDistribution(projectId?: string): Promise<ActionResult<HealthDistributionItem[]>> {
+    const cacheKey = `health-distribution-${projectId ?? 'all'}`;
     const cached = await globalCache.get<ActionResult<HealthDistributionItem[]>>(cacheKey);
     if (cached) return cached;
 
     try {
-      const rawServers = await serverRepository.findMany({ includeDeleted: false });
+      const rawServers = await serverRepository.findMany({
+        includeDeleted: false,
+        ...(projectId ? { projectId } : {}),
+      });
       await cacheService.refreshServers();
       const servers = cacheService.mergeRuntimeState(rawServers);
       const active = servers.filter((s) => !s.deletedAt);
@@ -227,13 +240,16 @@ class AnalyticsService {
     }
   }
 
-  async getActiveConnectionsOverTime(hours = 1): Promise<ActionResult<ChartDataPoint[]>> {
-    const cacheKey = `active-connections-${hours}`;
+  async getActiveConnectionsOverTime(hours = 1, projectId?: string): Promise<ActionResult<ChartDataPoint[]>> {
+    const cacheKey = `active-connections-${hours}-${projectId ?? 'all'}`;
     const cached = await globalCache.get<ActionResult<ChartDataPoint[]>>(cacheKey);
     if (cached) return cached;
 
     try {
-      const rawServers = await serverRepository.findMany({ includeDeleted: false });
+      const rawServers = await serverRepository.findMany({
+        includeDeleted: false,
+        ...(projectId ? { projectId } : {}),
+      });
       await cacheService.refreshServers();
       const servers = cacheService.mergeRuntimeState(rawServers);
       const active = servers.filter((s) => !s.deletedAt && s.enabled);
@@ -257,8 +273,8 @@ class AnalyticsService {
     }
   }
 
-  async getDashboardSnapshot(): Promise<ActionResult<CombinedDashboardData>> {
-    const cacheKey = 'dashboard-snapshot';
+  async getDashboardSnapshot(projectId?: string): Promise<ActionResult<CombinedDashboardData>> {
+    const cacheKey = `dashboard-snapshot-${projectId ?? 'all'}`;
     const cached = await globalCache.get<ActionResult<CombinedDashboardData>>(cacheKey);
     if (cached) return cached;
 
@@ -272,13 +288,13 @@ class AnalyticsService {
         healthDistRes,
         activeConnRes,
       ] = await Promise.all([
-        this.getDashboardStats(),
-        this.getServerMetrics(),
-        this.getRequestsOverTime(24),
-        this.getResponseTimeOverTime(24),
-        this.getRequestsPerServer(),
-        this.getHealthDistribution(),
-        this.getActiveConnectionsOverTime(),
+        this.getDashboardStats(projectId),
+        this.getServerMetrics(projectId),
+        this.getRequestsOverTime(24, projectId),
+        this.getResponseTimeOverTime(24, projectId),
+        this.getRequestsPerServer(projectId),
+        this.getHealthDistribution(projectId),
+        this.getActiveConnectionsOverTime(1, projectId),
       ]);
 
       const result: ActionResult<CombinedDashboardData> = {

@@ -14,8 +14,10 @@ export class RetryService {
 
   async executeWithRetry(
     request: Request,
+    downstreamPath: string,
     servers: Server[],
-    settings: Settings
+    settings: Settings,
+    projectId: string
   ): Promise<Response> {
     const maxRetries = settings.maxRetries ?? 3;
     const requestTimeout = settings.requestTimeout ?? 10000;
@@ -23,8 +25,7 @@ export class RetryService {
 
     const overallStartTime = Date.now();
     const requestId = crypto.randomUUID();
-    const url = new URL(request.url);
-    const route = url.pathname + url.search;
+    const route = downstreamPath;
     const method = (request.method?.toUpperCase() as HttpMethod) || HttpMethod.GET;
 
     const triedServerIds = new Set<string>();
@@ -33,13 +34,18 @@ export class RetryService {
     let lastError: string | null = null;
 
     while (attempt <= maxRetries) {
-      const healthyServers = HealthFilter.filter(servers);
+      // LoadBalancer normally supplies a project-scoped list. Keep this
+      // invariant at the retry boundary as well so a stale or malformed cache
+      // can never make a retry cross into another project's pool.
+      const projectServers = servers.filter((server) => server.projectId === projectId);
+      const healthyServers = HealthFilter.filter(projectServers);
       const availableServers = healthyServers.filter((s) => !triedServerIds.has(s.id));
 
       if (availableServers.length === 0) {
         const responseTimeMs = Date.now() - overallStartTime;
         const errMsg = 'No healthy backend available.';
         this.logRequestSilently({
+          projectId,
           requestId,
           method,
           route,
@@ -62,6 +68,7 @@ export class RetryService {
         const responseTimeMs = Date.now() - overallStartTime;
         const errMsg = 'No healthy backend available.';
         this.logRequestSilently({
+          projectId,
           requestId,
           method,
           route,
@@ -86,7 +93,12 @@ export class RetryService {
 
       try {
         const requestClone = request.clone();
-        const response = await this.forwarder.forward(selectedServer, requestClone, requestTimeout);
+        const response = await this.forwarder.forward(
+          selectedServer,
+          requestClone,
+          requestTimeout,
+          downstreamPath
+        );
         const latency = Date.now() - startTime;
 
         if (response.status === 502 || response.status === 503 || response.status === 504) {
@@ -97,6 +109,7 @@ export class RetryService {
 
         const responseTimeMs = Date.now() - overallStartTime;
         this.logRequestSilently({
+          projectId,
           requestId,
           method,
           route,
@@ -121,6 +134,7 @@ export class RetryService {
     const responseTimeMs = Date.now() - overallStartTime;
     const finalErrorMessage = lastError || 'No healthy backend available.';
     this.logRequestSilently({
+      projectId,
       requestId,
       method,
       route,
@@ -139,6 +153,7 @@ export class RetryService {
   }
 
   private logRequestSilently(data: {
+    projectId?: string | null;
     requestId: string;
     method: HttpMethod;
     route: string;

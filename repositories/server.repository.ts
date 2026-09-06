@@ -43,12 +43,23 @@ class ServerRepository implements IRepository<Server, CreateServerInput, UpdateS
     }
   }
 
-  async findByUrl(url: string): Promise<Server | null> {
+  async findByUrlAndProject(
+    url: string,
+    projectId: string | null,
+    excludeId?: string
+  ): Promise<Server | null> {
     try {
-      // Only check non-deleted servers for uniqueness
-      return await db.server.findFirst({ where: { url, deletedAt: null } });
+      // Server URLs are reusable across projects, but not within one project.
+      return await db.server.findFirst({
+        where: {
+          url,
+          projectId,
+          deletedAt: null,
+          ...(excludeId ? { NOT: { id: excludeId } } : {}),
+        },
+      });
     } catch (e) {
-      throw new DatabaseError(`findByUrl failed: ${(e as Error).message}`);
+      throw new DatabaseError(`findByUrlAndProject failed: ${(e as Error).message}`);
     }
   }
 
@@ -95,10 +106,10 @@ class ServerRepository implements IRepository<Server, CreateServerInput, UpdateS
     }
   }
 
-  async findEnabled(): Promise<Server[]> {
+  async findEnabled(projectId?: string): Promise<Server[]> {
     try {
       return await db.server.findMany({
-        where: { enabled: true, deletedAt: null },
+        where: { enabled: true, deletedAt: null, ...(projectId ? { projectId } : {}) },
         orderBy: [{ priority: 'desc' }, { weight: 'desc' }],
       });
     } catch (e) {
@@ -279,6 +290,7 @@ function buildServerWhere(filters: ServerFilters): Prisma.ServerWhereInput {
   // Soft delete: exclude deleted by default
   where.deletedAt = filters.includeDeleted ? undefined : null;
 
+  if (filters.projectId !== undefined) where.projectId = filters.projectId;
   if (filters.enabled !== undefined) where.enabled = filters.enabled;
   if (filters.healthy !== undefined) where.healthy = filters.healthy;
 

@@ -7,6 +7,7 @@ import type { ActionResult, PaginatedActionResult } from '@/types/api';
 
 export const loggingService = {
   async createLog(data: {
+    projectId?: string | null;
     requestId: string;
     method: HttpMethod;
     route: string;

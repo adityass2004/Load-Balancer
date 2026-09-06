@@ -8,62 +8,6 @@ datasource db {
   provider = "postgresql"
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model app_installs {
-  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id        String?
-  device_id      String          @unique
-  platform       String
-  app_version    String?
-  installed_at   DateTime?       @default(now()) @db.Timestamptz(6)
-  last_active    DateTime?       @default(now()) @db.Timestamptz(6)
-  reminder_users reminder_users?
-
-  @@index([user_id], map: "idx_app_installs_user_id")
-}
-
-model reminder_content {
-  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  reminder_user_id String         @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title            String
-  description      String?
-  remind_at        DateTime       @db.Timestamptz(6)
-  status           ReminderStatus @default(PENDING)
-  created_at       DateTime       @db.Timestamptz(6)
-  updated_at       DateTime       @db.Timestamptz(6)
-  reminder_users   reminder_users @relation(fields: [reminder_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  @@index([remind_at])
-  @@index([reminder_user_id])
-}
-
-model reminder_users {
-  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id          String             @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  max_reminders    Int                @default(7)
-  created_at       DateTime           @default(now())
-  reminder_content reminder_content[]
-  app_installs     app_installs       @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-}
-
-model users {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  external_id   String   @unique
-  created_at    DateTime @db.Timestamptz(6)
-  last_login_at DateTime @db.Timestamptz(6)
-  login_count   Int?     @default(0)
-}
-
-enum CampusLocation {
-  URBAN
-  RURAL
-}
-
-enum ReminderStatus {
-  PENDING
-  COMPLETED
-  CANCELLED
-}
 
 
 
@@ -87,13 +31,35 @@ enum ServerHealth {
 }
 
 // =========================
+// PROJECT
+// =========================
+
+model Project {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  slug        String       @unique
+  description String?
+  enabled     Boolean      @default(true)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  servers     Server[]
+  settings    Settings?
+  requestLogs RequestLog[]
+
+  @@index([enabled])
+  @@map("projects")
+}
+
+// =========================
 // SERVER
 // =========================
 
 model Server {
   id                  String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId           String?      @map("project_id") @db.Uuid
+  project             Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   name                String
-  url                 String       @unique
+  url                 String
   enabled             Boolean      @default(true)
   healthy             ServerHealth @default(UNKNOWN)
   weight              Int          @default(1)
@@ -110,6 +76,8 @@ model Server {
   @@index([enabled, healthy])
   @@index([priority])
   @@index([deletedAt])
+  @@index([projectId])
+  @@unique([projectId, url])
   @@map("servers")
 }
 
@@ -119,6 +87,8 @@ model Server {
 
 model Settings {
   id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId           String?   @unique @map("project_id") @db.Uuid
+  project             Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   algorithm           Algorithm @default(ROUND_ROBIN)
   healthCheckInterval Int       @default(30) @map("health_check_interval")
   healthCheckTimeout  Int       @default(5)  @map("health_check_timeout")
@@ -152,6 +122,8 @@ enum HttpMethod {
 
 model RequestLog {
   id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId      String?    @map("project_id") @db.Uuid
+  project        Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   requestId      String     @map("request_id") @db.Uuid
   method         HttpMethod
   route          String
@@ -168,5 +140,7 @@ model RequestLog {
   @@index([backendId])
   @@index([statusCode])
   @@index([method])
+  @@index([projectId])
+  @@index([projectId, createdAt])
   @@map("request_logs")
 }

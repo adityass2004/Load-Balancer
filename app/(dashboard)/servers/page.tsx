@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { buildHealthUrl } from '@/lib/utils';
 import { useRefresh } from '@/context/RefreshContext';
+import { useProject } from '@/context/ProjectContext';
 import {
   useServers,
   useCreateServer,
@@ -61,6 +62,7 @@ function StatusBadge({ status, enabled }: { status: ServerHealth; enabled: boole
 
 export default function ServersPage() {
   const queryClient = useQueryClient();
+  const { selectedProjectId, projects } = useProject();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
   const [healthFilter, setHealthFilter] = useState<'all' | ServerHealth>('all');
@@ -68,13 +70,14 @@ export default function ServersPage() {
   // Query state — stable reference across renders
   const params = useMemo(
     () => ({
+      projectId: selectedProjectId ?? undefined,
       search: search || undefined,
       enabled: statusFilter === 'all' ? undefined : statusFilter === 'enabled',
       healthy: healthFilter === 'all' ? undefined : healthFilter,
       page: 1,
       pageSize: 100, // retrieve all for management list
     }),
-    [search, statusFilter, healthFilter]
+    [selectedProjectId, search, statusFilter, healthFilter]
   );
 
   const { refetchInterval } = useRefresh();
@@ -102,6 +105,7 @@ export default function ServersPage() {
   // Form State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<Server | null>(null);
+  const [formProjectId, setFormProjectId] = useState<string | null>(selectedProjectId);
   const [formName, setFormName] = useState('');
   const [formUrl, setFormUrl] = useState('');
   const [formWeight, setFormWeight] = useState(1);
@@ -159,6 +163,7 @@ export default function ServersPage() {
 
   const openAddForm = () => {
     setEditingServer(null);
+    setFormProjectId(selectedProjectId ?? (projects[0]?.id || null));
     setFormName('');
     setFormUrl('');
     setFormWeight(1);
@@ -172,6 +177,7 @@ export default function ServersPage() {
 
   const openEditForm = (server: Server) => {
     setEditingServer(server);
+    setFormProjectId(server.projectId || selectedProjectId || null);
     setFormName(server.name);
     setFormUrl(server.url);
     setFormWeight(server.weight);
@@ -238,6 +244,7 @@ export default function ServersPage() {
         const res = await updateServer.mutateAsync({
           id: editingServer.id,
           data: {
+            projectId: formProjectId || null,
             name: formName,
             url: formUrl,
             weight: formWeight,
@@ -251,6 +258,7 @@ export default function ServersPage() {
         }
       } else {
         const res = await createServer.mutateAsync({
+          projectId: formProjectId || selectedProjectId || null,
           name: formName,
           enabled: true,
           url: formUrl,
@@ -420,7 +428,7 @@ export default function ServersPage() {
                       <ul className="mt-3 inline-block text-left text-xs text-gray-500 space-y-1">
                         <li>💡 Newly created servers start in <span className="font-semibold">Disabled</span> state.</li>
                         <li>💡 Edited servers are auto-disabled after every change.</li>
-                        <li>💡 Set Status filter to <span className="font-semibold">'All Enabled States'</span> to see them.</li>
+                        <li>💡 Set Status filter to <span className="font-semibold">&apos;All Enabled States&apos;</span> to see them.</li>
                         <li>💡 A server must pass a health check (<span className="font-semibold">HEALTHY</span>) before it can be Enabled.</li>
                       </ul>
                       <button
@@ -439,7 +447,21 @@ export default function ServersPage() {
                   servers.map((server) => (
                     <tr key={server.id} className="transition-colors hover:bg-gray-50">
                       <td className="px-4 py-4">
-                        <div className="font-semibold text-gray-900">{server.name}</div>
+                        <div className="font-semibold text-gray-900 flex items-center gap-2">
+                          <span>{server.name}</span>
+                          {(() => {
+                            const proj = projects.find((p) => p.id === server.projectId);
+                            return proj ? (
+                              <span className="rounded-md bg-gray-100 border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">
+                                {proj.name}
+                              </span>
+                            ) : server.projectId ? (
+                              <span className="rounded-md bg-gray-100 border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-400">
+                                Project
+                              </span>
+                            ) : null;
+                          })()}
+                        </div>
                         <div className="text-xs text-gray-500 font-mono mt-0.5">{server.url}</div>
                         <div className="text-[10px] text-gray-400 font-mono mt-0.5">
                           health: {buildHealthUrl(server.url)}
@@ -601,6 +623,25 @@ export default function ServersPage() {
                   <div>{formError}</div>
                 </div>
               )}
+
+              {/* Associated Project */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wider">
+                  Associated Project
+                </label>
+                <select
+                  value={formProjectId || ''}
+                  onChange={(e) => setFormProjectId(e.target.value || null)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white font-medium text-gray-900"
+                >
+                  <option value="">Unassigned / Global</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.slug})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               {/* Name */}
               <div>

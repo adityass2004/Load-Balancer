@@ -1,15 +1,26 @@
 import { cacheService } from '@/services/cache/CacheService';
 import { RetryService } from './RetryService';
+import type { Project } from '@/types/domain';
 
 export class LoadBalancer {
   constructor(private readonly retryService: RetryService) { }
 
-  async handleRequest(request: Request): Promise<Response> {
+  async handleRequest(
+    request: Request,
+    project: Project,
+    downstreamPath: string
+  ): Promise<Response> {
     try {
-      const servers = await cacheService.getServers();
-      const settings = await cacheService.getSettings();
+      const servers = await cacheService.getServersForProject(project.id);
+      const settings = await cacheService.getSettingsForProject(project.id);
 
-      return await this.retryService.executeWithRetry(request, servers, settings);
+      return await this.retryService.executeWithRetry(
+        request,
+        downstreamPath,
+        servers,
+        settings,
+        project.id
+      );
     } catch (error: any) {
       console.error(`[LOAD_BALANCER] Internal Error: ${error.message}`);
       return new Response(

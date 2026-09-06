@@ -10,40 +10,45 @@ import type {
   CombinedDashboardData,
 } from '@/types/domain';
 
-export async function getDashboardSnapshotAction(): Promise<ActionResult<CombinedDashboardData>> {
-  return analyticsService.getDashboardSnapshot();
+export async function getDashboardSnapshotAction(projectId?: string): Promise<ActionResult<CombinedDashboardData>> {
+  return analyticsService.getDashboardSnapshot(projectId);
 }
 
-export async function getDashboardStatsAction(): Promise<ActionResult<DashboardStats>> {
-  return analyticsService.getDashboardStats();
+export async function getDashboardStatsAction(projectId?: string): Promise<ActionResult<DashboardStats>> {
+  return analyticsService.getDashboardStats(projectId);
 }
 
-export async function getServerMetricsAction(): Promise<ActionResult<ServerMetric[]>> {
-  return analyticsService.getServerMetrics();
+export async function getServerMetricsAction(projectId?: string): Promise<ActionResult<ServerMetric[]>> {
+  return analyticsService.getServerMetrics(projectId);
 }
 
 export async function getRequestsOverTimeAction(
-  hours?: number
+  hours?: number,
+  projectId?: string
 ): Promise<ActionResult<ChartDataPoint[]>> {
-  return analyticsService.getRequestsOverTime(hours);
+  return analyticsService.getRequestsOverTime(hours, projectId);
 }
 
 export async function getResponseTimeOverTimeAction(
-  hours?: number
+  hours?: number,
+  projectId?: string
 ): Promise<ActionResult<ChartDataPoint[]>> {
-  return analyticsService.getResponseTimeOverTime(hours);
+  return analyticsService.getResponseTimeOverTime(hours, projectId);
 }
 
-export async function getRequestsPerServerAction(): Promise<ActionResult<ChartDataPoint[]>> {
-  return analyticsService.getRequestsPerServer();
+export async function getRequestsPerServerAction(projectId?: string): Promise<ActionResult<ChartDataPoint[]>> {
+  return analyticsService.getRequestsPerServer(projectId);
 }
 
-export async function getHealthDistributionAction(): Promise<ActionResult<HealthDistributionItem[]>> {
-  return analyticsService.getHealthDistribution();
+export async function getHealthDistributionAction(projectId?: string): Promise<ActionResult<HealthDistributionItem[]>> {
+  return analyticsService.getHealthDistribution(projectId);
 }
 
-export async function getActiveConnectionsOverTimeAction(): Promise<ActionResult<ChartDataPoint[]>> {
-  return analyticsService.getActiveConnectionsOverTime();
+export async function getActiveConnectionsOverTimeAction(
+  hours?: number,
+  projectId?: string
+): Promise<ActionResult<ChartDataPoint[]>> {
+  return analyticsService.getActiveConnectionsOverTime(hours, projectId);
 }
 
 export async function triggerHealthCheckAction() {

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { healthScheduler } from '@/services/health/HealthScheduler';
 
+export const dynamic = 'force-dynamic';
+
 let lastCronExecution = 0;
 
 export async function GET(request: Request) {

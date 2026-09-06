@@ -17,18 +17,21 @@ const DEFAULT_SETTINGS = {
 };
 
 export const settingsService = {
-  async get(): Promise<ActionResult<Settings>> {
+  async get(projectId?: string): Promise<ActionResult<Settings>> {
     try {
-      const data = await settingsRepository.getOrCreate(DEFAULT_SETTINGS);
+      const defaults = { ...DEFAULT_SETTINGS, ...(projectId ? { projectId } : {}) };
+      const data = await settingsRepository.getOrCreate(defaults, projectId);
       return { success: true, data };
     } catch (e) {
       return { success: false, error: toActionError(e) };
     }
   },
 
-  async update(input: UpdateSettingsInput): Promise<ActionResult<Settings>> {
+  async update(input: UpdateSettingsInput, projectId?: string): Promise<ActionResult<Settings>> {
     try {
-      const existing = await settingsRepository.getOrCreate(DEFAULT_SETTINGS);
+      const targetProjectId = projectId || input.projectId || undefined;
+      const defaults = { ...DEFAULT_SETTINGS, ...(targetProjectId ? { projectId: targetProjectId } : {}) };
+      const existing = await settingsRepository.getOrCreate(defaults, targetProjectId);
       const data = await settingsRepository.update(existing.id, input);
       cacheService.refreshSettings().catch(console.error);
       return { success: true, data };
@@ -37,9 +40,10 @@ export const settingsService = {
     }
   },
 
-  async reset(): Promise<ActionResult<Settings>> {
+  async reset(projectId?: string): Promise<ActionResult<Settings>> {
     try {
-      const data = await settingsRepository.upsert(DEFAULT_SETTINGS);
+      const defaults = { ...DEFAULT_SETTINGS, ...(projectId ? { projectId } : {}) };
+      const data = await settingsRepository.upsert(defaults, projectId);
       cacheService.refreshSettings().catch(console.error);
       return { success: true, data };
     } catch (e) {

@@ -24,6 +24,7 @@ export type ServerSortField =
   | 'averageResponseTime';
 
 export type ServerFilters = {
+  projectId?: string;
   enabled?: boolean;
   healthy?: import('@/src/generated/prisma').ServerHealth;
   search?: string;
@@ -37,6 +38,19 @@ export type ServerQueryParams = ServerFilters & PaginationParams & {
 };
 
 export type SettingsFilters = Record<string, never>;
+
+// All sortable fields on the Project model
+export type ProjectSortField = 'name' | 'slug' | 'createdAt' | 'updatedAt';
+
+export type ProjectFilters = {
+  enabled?: boolean;
+  search?: string;
+};
+
+export type ProjectQueryParams = ProjectFilters & PaginationParams & {
+  sortField?: ProjectSortField;
+  sortOrder?: SortOrder;
+};
 
 // Generic repository interface — all repositories implement this shape
 export interface IRepository<TModel, TCreate, TUpdate, TFilters = Record<string, unknown>> {

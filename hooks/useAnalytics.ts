@@ -23,23 +23,24 @@ import type { ActionResult } from '@/types/api';
 
 export const analyticsKeys = {
   all: ['analytics'] as const,
-  combined: () => [...analyticsKeys.all, 'combined'] as const,
-  stats: () => [...analyticsKeys.all, 'stats'] as const,
-  serverMetrics: () => [...analyticsKeys.all, 'serverMetrics'] as const,
-  requestsOverTime: (hours: number) => [...analyticsKeys.all, 'requestsOverTime', hours] as const,
-  responseTimeOverTime: (hours: number) => [...analyticsKeys.all, 'responseTimeOverTime', hours] as const,
-  requestsPerServer: () => [...analyticsKeys.all, 'requestsPerServer'] as const,
-  healthDistribution: () => [...analyticsKeys.all, 'healthDistribution'] as const,
-  activeConnections: () => [...analyticsKeys.all, 'activeConnections'] as const,
+  combined: (projectId?: string) => [...analyticsKeys.all, 'combined', projectId ?? 'all'] as const,
+  stats: (projectId?: string) => [...analyticsKeys.all, 'stats', projectId ?? 'all'] as const,
+  serverMetrics: (projectId?: string) => [...analyticsKeys.all, 'serverMetrics', projectId ?? 'all'] as const,
+  requestsOverTime: (hours: number, projectId?: string) => [...analyticsKeys.all, 'requestsOverTime', hours, projectId ?? 'all'] as const,
+  responseTimeOverTime: (hours: number, projectId?: string) => [...analyticsKeys.all, 'responseTimeOverTime', hours, projectId ?? 'all'] as const,
+  requestsPerServer: (projectId?: string) => [...analyticsKeys.all, 'requestsPerServer', projectId ?? 'all'] as const,
+  healthDistribution: (projectId?: string) => [...analyticsKeys.all, 'healthDistribution', projectId ?? 'all'] as const,
+  activeConnections: (projectId?: string) => [...analyticsKeys.all, 'activeConnections', projectId ?? 'all'] as const,
 };
 
 export function useDashboardData(
+  projectId?: string,
   options?: Omit<UseQueryOptions<ActionResult<CombinedDashboardData>>, 'queryKey' | 'queryFn'>
 ) {
   const { refetchInterval } = useRefresh();
   return useQuery({
-    queryKey: analyticsKeys.combined(),
-    queryFn: getDashboardSnapshotAction,
+    queryKey: analyticsKeys.combined(projectId),
+    queryFn: () => getDashboardSnapshotAction(projectId),
     refetchInterval,
     refetchOnWindowFocus: false,
     staleTime: typeof refetchInterval === 'number' ? refetchInterval : Infinity,
@@ -48,12 +49,13 @@ export function useDashboardData(
 }
 
 export function useDashboardStats(
+  projectId?: string,
   options?: Omit<UseQueryOptions<ActionResult<DashboardStats>>, 'queryKey' | 'queryFn'>
 ) {
   const { refetchInterval } = useRefresh();
   return useQuery({
-    queryKey: analyticsKeys.stats(),
-    queryFn: getDashboardStatsAction,
+    queryKey: analyticsKeys.stats(projectId),
+    queryFn: () => getDashboardStatsAction(projectId),
     refetchInterval,
     refetchOnWindowFocus: false,
     staleTime: typeof refetchInterval === 'number' ? refetchInterval : Infinity,
@@ -62,12 +64,13 @@ export function useDashboardStats(
 }
 
 export function useServerMetrics(
+  projectId?: string,
   options?: Omit<UseQueryOptions<ActionResult<ServerMetric[]>>, 'queryKey' | 'queryFn'>
 ) {
   const { refetchInterval } = useRefresh();
   return useQuery({
-    queryKey: analyticsKeys.serverMetrics(),
-    queryFn: getServerMetricsAction,
+    queryKey: analyticsKeys.serverMetrics(projectId),
+    queryFn: () => getServerMetricsAction(projectId),
     refetchInterval,
     refetchOnWindowFocus: false,
     staleTime: typeof refetchInterval === 'number' ? refetchInterval : Infinity,
@@ -77,12 +80,13 @@ export function useServerMetrics(
 
 export function useRequestsOverTime(
   hours = 24,
+  projectId?: string,
   options?: Omit<UseQueryOptions<ActionResult<ChartDataPoint[]>>, 'queryKey' | 'queryFn'>
 ) {
   const { refetchInterval } = useRefresh();
   return useQuery({
-    queryKey: analyticsKeys.requestsOverTime(hours),
-    queryFn: () => getRequestsOverTimeAction(hours),
+    queryKey: analyticsKeys.requestsOverTime(hours, projectId),
+    queryFn: () => getRequestsOverTimeAction(hours, projectId),
     refetchInterval,
     refetchOnWindowFocus: false,
     staleTime: typeof refetchInterval === 'number' ? refetchInterval : Infinity,
@@ -92,12 +96,13 @@ export function useRequestsOverTime(
 
 export function useResponseTimeOverTime(
   hours = 24,
+  projectId?: string,
   options?: Omit<UseQueryOptions<ActionResult<ChartDataPoint[]>>, 'queryKey' | 'queryFn'>
 ) {
   const { refetchInterval } = useRefresh();
   return useQuery({
-    queryKey: analyticsKeys.responseTimeOverTime(hours),
-    queryFn: () => getResponseTimeOverTimeAction(hours),
+    queryKey: analyticsKeys.responseTimeOverTime(hours, projectId),
+    queryFn: () => getResponseTimeOverTimeAction(hours, projectId),
     refetchInterval,
     refetchOnWindowFocus: false,
     staleTime: typeof refetchInterval === 'number' ? refetchInterval : Infinity,
@@ -106,12 +111,13 @@ export function useResponseTimeOverTime(
 }
 
 export function useRequestsPerServer(
+  projectId?: string,
   options?: Omit<UseQueryOptions<ActionResult<ChartDataPoint[]>>, 'queryKey' | 'queryFn'>
 ) {
   const { refetchInterval } = useRefresh();
   return useQuery({
-    queryKey: analyticsKeys.requestsPerServer(),
-    queryFn: getRequestsPerServerAction,
+    queryKey: analyticsKeys.requestsPerServer(projectId),
+    queryFn: () => getRequestsPerServerAction(projectId),
     refetchInterval,
     refetchOnWindowFocus: false,
     staleTime: typeof refetchInterval === 'number' ? refetchInterval : Infinity,
@@ -120,12 +126,13 @@ export function useRequestsPerServer(
 }
 
 export function useHealthDistribution(
+  projectId?: string,
   options?: Omit<UseQueryOptions<ActionResult<HealthDistributionItem[]>>, 'queryKey' | 'queryFn'>
 ) {
   const { refetchInterval } = useRefresh();
   return useQuery({
-    queryKey: analyticsKeys.healthDistribution(),
-    queryFn: getHealthDistributionAction,
+    queryKey: analyticsKeys.healthDistribution(projectId),
+    queryFn: () => getHealthDistributionAction(projectId),
     refetchInterval,
     refetchOnWindowFocus: false,
     staleTime: typeof refetchInterval === 'number' ? refetchInterval : Infinity,
@@ -134,12 +141,13 @@ export function useHealthDistribution(
 }
 
 export function useActiveConnections(
+  projectId?: string,
   options?: Omit<UseQueryOptions<ActionResult<ChartDataPoint[]>>, 'queryKey' | 'queryFn'>
 ) {
   const { refetchInterval } = useRefresh();
   return useQuery({
-    queryKey: analyticsKeys.activeConnections(),
-    queryFn: getActiveConnectionsOverTimeAction,
+    queryKey: analyticsKeys.activeConnections(projectId),
+    queryFn: () => getActiveConnectionsOverTimeAction(1, projectId),
     refetchInterval,
     refetchOnWindowFocus: false,
     staleTime: typeof refetchInterval === 'number' ? refetchInterval : Infinity,
