@@ -3,7 +3,7 @@ import { RequestForwarder } from './RequestForwarder';
 import { MetricsCollector } from './MetricsCollector';
 import { Server, Settings, HttpMethod } from '@/types/domain';
 import { HealthFilter } from './HealthFilter';
-import { loggingService } from '@/services/logging/LoggingService';
+import { getLogQueue } from '@/services/logging/LogQueue';
 import { isIdempotentMethod } from './retry-policy';
 import { BodyTooLargeError, isClientAbort, type RequestPayload } from './body-policy';
 
@@ -346,8 +346,10 @@ export class RetryService {
     retryCount: number;
     errorMessage: string | null;
   }): void {
-    loggingService.createLog(data).catch((err) => {
-      console.error('[LOGGING] Failed to create request log:', err?.message || err);
-    });
+    try {
+      getLogQueue().enqueue(data);
+    } catch {
+      // enqueue should never throw, but guard defensively
+    }
   }
 }

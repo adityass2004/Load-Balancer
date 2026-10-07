@@ -4,7 +4,7 @@ import { ServerSelector } from '../ServerSelector';
 import { RequestForwarder } from '../RequestForwarder';
 import { MetricsCollector } from '../MetricsCollector';
 import { Server, Settings, Algorithm, ServerHealth } from '@/types/domain';
-import { loggingService } from '@/services/logging/LoggingService';
+import { getLogQueue } from '@/services/logging/LogQueue';
 
 describe('RetryService - Idempotency & Retry Enforcement', () => {
   let selector: ServerSelector;
@@ -67,9 +67,8 @@ describe('RetryService - Idempotency & Retry Enforcement', () => {
 
   beforeEach(() => {
     loggedEntries = [];
-    vi.spyOn(loggingService, 'createLog').mockImplementation(async (data: any) => {
+    vi.spyOn(getLogQueue(), 'enqueue').mockImplementation((data: any) => {
       loggedEntries.push(data);
-      return { success: true, data: data as any };
     });
 
     selector = {
