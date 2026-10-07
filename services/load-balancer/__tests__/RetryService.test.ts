@@ -65,6 +65,8 @@ describe('RetryService - Idempotency & Retry Enforcement', () => {
     updatedAt: new Date(),
   };
 
+  const instantSleep = async () => {};
+
   beforeEach(() => {
     loggedEntries = [];
     vi.spyOn(getLogQueue(), 'enqueue').mockImplementation((data: any) => {
@@ -84,7 +86,7 @@ describe('RetryService - Idempotency & Retry Enforcement', () => {
       recordRequestEnd: vi.fn().mockResolvedValue(undefined),
     } as unknown as MetricsCollector;
 
-    retryService = new RetryService(selector, forwarder, metrics);
+    retryService = new RetryService(selector, forwarder, metrics, instantSleep);
   });
 
   it('GET: retries on 503 from Server A and succeeds on Server B', async () => {
