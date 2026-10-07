@@ -7,11 +7,50 @@ import { getLogQueue } from '@/services/logging/LogQueue';
 import { isIdempotentMethod } from './retry-policy';
 import { BodyTooLargeError, isClientAbort, type RequestPayload } from './body-policy';
 
+export type SleepFn = (ms: number, signal?: AbortSignal) => Promise<void>;
+export type RandomFn = () => number;
+
+export const defaultSleepFn: SleepFn = (ms: number, signal?: AbortSignal) => {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      return reject(new Error('Client aborted'));
+    }
+    let timer: NodeJS.Timeout | null = null;
+
+    const onAbort = () => {
+      if (timer) clearTimeout(timer);
+      reject(new Error('Client aborted'));
+    };
+
+    if (signal) {
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+
+    timer = setTimeout(() => {
+      if (signal) signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+  });
+};
+
+export function calculateRetryDelay(
+  attempt: number,
+  baseDelayMs = 50,
+  maxDelayMs = 300,
+  randomFn = Math.random
+): number {
+  if (attempt <= 0) return 0;
+  const cap = Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt - 1));
+  return Math.floor(randomFn() * cap);
+}
+
 export class RetryService {
   constructor(
     private readonly selector: ServerSelector,
     private readonly forwarder: RequestForwarder,
-    private readonly metrics: MetricsCollector
+    private readonly metrics: MetricsCollector,
+    private readonly sleepFn: SleepFn = defaultSleepFn,
+    private readonly randomFn: RandomFn = Math.random
   ) {}
 
   async executeWithRetry(
@@ -28,6 +67,11 @@ export class RetryService {
     const requestTimeout = settings.requestTimeout ?? 10000;
     const maxFailures = settings.maxFailures ?? 3;
 
+    const baseDelayMs = parseInt(process.env.RETRY_BASE_DELAY_MS || '50', 10) || 50;
+    const maxDelayMs = parseInt(process.env.RETRY_MAX_DELAY_MS || '300', 10) || 300;
+    const maxTotalMs = parseInt(process.env.RETRY_MAX_TOTAL_MS || '2000', 10) || 2000;
+    let totalSleepMs = 0;
+
     const overallStartTime = Date.now();
     const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
     const route = downstreamPath;
@@ -42,6 +86,49 @@ export class RetryService {
     let lastError: string | null = null;
 
     while (attempt <= maxRetries) {
+      if (attempt > 0) {
+        let delay = calculateRetryDelay(attempt, baseDelayMs, maxDelayMs, this.randomFn);
+        if (totalSleepMs + delay > maxTotalMs) {
+          delay = maxTotalMs - totalSleepMs;
+        }
+
+        if (delay <= 0 || totalSleepMs >= maxTotalMs) {
+          console.warn(`[RETRY_BUDGET] requestId=${requestId} retry sleep budget exhausted (${totalSleepMs}ms / ${maxTotalMs}ms)`);
+          break;
+        }
+
+        try {
+          await this.sleepFn(delay, request.signal);
+          totalSleepMs += delay;
+        } catch (err: any) {
+          if (isClientAbort(err, request.signal)) {
+            const responseTimeMs = Date.now() - overallStartTime;
+            this.logRequestSilently({
+              projectId,
+              requestId,
+              method,
+              route,
+              backendId: lastSelectedServer?.id ?? null,
+              backendUrl: lastSelectedServer?.url ?? null,
+              statusCode: 499,
+              responseTimeMs,
+              retryCount: attempt,
+              errorMessage: 'Client disconnected during retry backoff',
+            });
+            return new Response(
+              JSON.stringify({ error: 'Client disconnected' }),
+              {
+                status: 499,
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-request-id': requestId,
+                },
+              }
+            );
+          }
+          throw err;
+        }
+      }
       // LoadBalancer normally supplies a project-scoped list. Keep this
       // invariant at the retry boundary as well so a stale or malformed cache
       // can never make a retry cross into another project's pool.

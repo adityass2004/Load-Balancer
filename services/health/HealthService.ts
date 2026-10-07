@@ -66,14 +66,23 @@ class HealthService implements IHealthService {
     if (servers.length === 0) return [];
 
     const enabledServers = servers.filter((s) => s.enabled && !s.deletedAt);
+    const envConcurrency = parseInt(process.env.HEALTH_PROBE_CONCURRENCY || '10', 10);
+    const concurrency = isNaN(envConcurrency) || envConcurrency < 1 ? 10 : envConcurrency;
 
-    const results = await Promise.allSettled(
-      enabledServers.map((server) => this.checkServer(server))
-    );
+    const results: HealthCheckResult[] = [];
+    for (let i = 0; i < enabledServers.length; i += concurrency) {
+      const chunk = enabledServers.slice(i, i + concurrency);
+      const chunkResults = await Promise.allSettled(
+        chunk.map((server) => this.checkServer(server))
+      );
+      for (const res of chunkResults) {
+        if (res.status === 'fulfilled') {
+          results.push(res.value);
+        }
+      }
+    }
 
-    return results
-      .filter((r): r is PromiseFulfilledResult<HealthCheckResult> => r.status === 'fulfilled')
-      .map((r) => r.value);
+    return results;
   }
 
   private handleSuccess(server: Server, result: HealthCheckResult): void {

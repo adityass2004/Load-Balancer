@@ -197,6 +197,7 @@ async function handler(
   }
 
   // 5. Project health shortcut: /api/{projectSlug} has no backend path.
+  // READ ONLY from in-memory cache — ZERO outbound network probes (HIGH-06)
   if (path.length === 1) {
     const servers = await cacheService.getServersForProject(project.id);
     const enabledServers = servers.filter((s) => s.enabled && !s.deletedAt);
@@ -207,6 +208,7 @@ async function handler(
           project: project.slug,
           projectName: project.name,
           healthy: false,
+          stale: false,
           message: "No enabled backends found for project.",
           servers: [],
         },
@@ -214,18 +216,46 @@ async function handler(
       );
     }
 
-    const healthResults = await Promise.all(
-      enabledServers.map((server) => healthScheduler.checkServer(server))
-    );
+    const now = Date.now();
+    const staleAfterSec = parseInt(process.env.HEALTH_STALE_AFTER_SEC || '60', 10) || 60;
+    const staleThresholdMs = staleAfterSec * 1000;
+    let isStale = false;
 
-    const overallHealthy = healthResults.length > 0 && healthResults.some((r) => r.success);
+    const serverHealthResults = enabledServers.map((server) => {
+      const lastCheckTime = server.lastHealthCheck ? new Date(server.lastHealthCheck).getTime() : null;
+      if (lastCheckTime === null || now - lastCheckTime > staleThresholdMs) {
+        isStale = true;
+      }
+
+      const statusStr =
+        server.healthy === 'HEALTHY'
+          ? 'healthy'
+          : server.healthy === 'UNHEALTHY'
+          ? 'unhealthy'
+          : 'unknown';
+
+      return {
+        serverId: server.id,
+        serverName: server.name,
+        url: server.url,
+        status: statusStr,
+        statusCode: statusStr === 'healthy' ? 200 : null,
+        latencyMs: server.averageResponseTime || null,
+        lastCheckedAt: server.lastHealthCheck ? new Date(server.lastHealthCheck).toISOString() : null,
+        error: statusStr === 'unhealthy' ? 'Server marked unhealthy in cache' : null,
+      };
+    });
+
+    const overallHealthy =
+      enabledServers.length > 0 && enabledServers.some((s) => s.healthy === 'HEALTHY');
 
     return NextResponse.json(
       {
         project: project.slug,
         projectName: project.name,
         healthy: overallHealthy,
-        servers: healthResults,
+        stale: isStale,
+        servers: serverHealthResults,
       },
       { status: overallHealthy ? 200 : 503, headers: { 'x-request-id': requestId } }
     );
