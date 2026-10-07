@@ -237,12 +237,8 @@ async function handler(
       return {
         serverId: server.id,
         serverName: server.name,
-        url: server.url,
         status: statusStr,
-        statusCode: statusStr === 'healthy' ? 200 : null,
-        latencyMs: server.averageResponseTime || null,
         lastCheckedAt: server.lastHealthCheck ? new Date(server.lastHealthCheck).toISOString() : null,
-        error: statusStr === 'unhealthy' ? 'Server marked unhealthy in cache' : null,
       };
     });
 

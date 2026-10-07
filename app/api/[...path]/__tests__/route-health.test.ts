@@ -17,6 +17,7 @@ describe('Public Root Endpoint GET /api/{projectSlug} (HIGH-06)', () => {
       id: 'proj-1',
       name: 'Trial Project',
       slug: 'trial',
+      description: null,
       enabled: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -59,6 +60,8 @@ describe('Public Root Endpoint GET /api/{projectSlug} (HIGH-06)', () => {
     expect(body.stale).toBe(false);
     expect(body.servers.length).toBe(1);
     expect(body.servers[0].status).toBe('healthy');
+    expect(body.servers[0].url).toBeUndefined();
+    expect(body.servers[0].error).toBeUndefined();
   });
 
   it('reports stale=true when lastHealthCheck is missing or older than HEALTH_STALE_AFTER_SEC', async () => {
@@ -66,6 +69,7 @@ describe('Public Root Endpoint GET /api/{projectSlug} (HIGH-06)', () => {
       id: 'proj-1',
       name: 'Trial Project',
       slug: 'trial',
+      description: null,
       enabled: true,
       createdAt: new Date(),
       updatedAt: new Date(),
