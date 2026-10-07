@@ -5,6 +5,7 @@ import { LeastConnectionsStrategy } from '../../strategies/LeastConnectionsStrat
 import { WeightedRoundRobinStrategy } from '../../strategies/WeightedRoundRobinStrategy';
 import { RandomStrategy } from '../../strategies/RandomStrategy';
 import { PriorityStrategy } from '../../strategies/PriorityStrategy';
+import { IPHashStrategy } from './strategies/IPHashStrategy';
 
 export class ServerSelector {
   private strategies: Record<Algorithm, LoadBalancingStrategy>;
@@ -18,14 +19,13 @@ export class ServerSelector {
       [Algorithm.WEIGHTED_ROUND_ROBIN]: new WeightedRoundRobinStrategy(),
       [Algorithm.RANDOM]: new RandomStrategy(),
       [Algorithm.PRIORITY]: new PriorityStrategy(),
-      // Fallback for IP_HASH to Round Robin (or we can use it directly)
-      [Algorithm.IP_HASH]: roundRobin,
+      [Algorithm.IP_HASH]: new IPHashStrategy(roundRobin),
     };
   }
 
-  select(servers: Server[], algorithm: Algorithm): Server | null {
+  select(servers: Server[], algorithm: Algorithm, clientIp?: string): Server | null {
     if (servers.length === 0) return null;
     const strategy = this.strategies[algorithm] || this.strategies[Algorithm.ROUND_ROBIN];
-    return strategy.selectServer(servers);
+    return strategy.selectServer(servers, clientIp);
   }
 }

@@ -2,6 +2,7 @@ import axios, { AxiosError } from 'axios';
 import type { IHealthChecker, HealthCheckResult, HealthCheckOutcome } from '@/types/health';
 import type { Server } from '@/types/domain';
 import { buildHealthUrl } from '@/lib/utils';
+import { getSafeAgents, assertLiteralIpAllowed, SsrfBlockedError } from '@/lib/security/ssrf-guard';
 
 class HealthChecker implements IHealthChecker {
   async check(
@@ -12,11 +13,43 @@ class HealthChecker implements IHealthChecker {
     const targetUrl = buildHealthUrl(server.url);
     const startTime = Date.now();
 
+    // ── B7: Connect-time literal-IP pre-check ──────────────────────────────
+    // Node does NOT call the guarded lookup for literal IPs; check explicitly.
+    try {
+      assertLiteralIpAllowed(targetUrl, server.id);
+    } catch (err) {
+      if (err instanceof SsrfBlockedError) {
+        const latencyMs = Date.now() - startTime;
+        console.warn(
+          `[SSRF] Health check blocked: category=${err.category} serverId=${server.id.slice(0, 8)}`
+        );
+        return {
+          serverId: server.id,
+          serverName: server.name,
+          url: targetUrl,
+          success: false,
+          outcome: 'connection_refused',
+          statusCode: null,
+          latencyMs,
+          checkedAt,
+          error: 'Bad Gateway: upstream request blocked',
+        };
+      }
+      throw err;
+    }
+
+    // ── B7: Use guarded agents for connect-time DNS check ──────────────────
+    const { httpAgent, httpsAgent } = getSafeAgents(server.id);
+
     try {
       const response = await axios.get(targetUrl, {
         timeout: timeoutMs,
         validateStatus: () => true, // handle all status codes manually
         headers: { 'User-Agent': 'LoadBalancer-HealthChecker/1.0' },
+        // B7: guard agents + proxy:false so HTTP_PROXY cannot bypass the guard
+        httpAgent,
+        httpsAgent,
+        proxy: false,
       });
 
       const latencyMs = Date.now() - startTime;
@@ -35,6 +68,44 @@ class HealthChecker implements IHealthChecker {
       };
     } catch (e) {
       const latencyMs = Date.now() - startTime;
+
+      // SsrfBlockedError thrown by guarded lookup at connect time
+      if (e instanceof SsrfBlockedError) {
+        console.warn(
+          `[SSRF] Health check connect-time blocked: category=${e.category} serverId=${server.id.slice(0, 8)}`
+        );
+        return {
+          serverId: server.id,
+          serverName: server.name,
+          url: targetUrl,
+          success: false,
+          outcome: 'connection_refused',
+          statusCode: null,
+          latencyMs,
+          checkedAt,
+          error: 'Bad Gateway: upstream request blocked',
+        };
+      }
+
+      // Check if the axios error wraps an SsrfBlockedError (thrown via lookup callback)
+      const anyErr = e as any;
+      if (anyErr?.code === 'SSRF_BLOCKED' || anyErr?.cause instanceof SsrfBlockedError) {
+        console.warn(
+          `[SSRF] Health check lookup blocked: serverId=${server.id.slice(0, 8)}`
+        );
+        return {
+          serverId: server.id,
+          serverName: server.name,
+          url: targetUrl,
+          success: false,
+          outcome: 'connection_refused',
+          statusCode: null,
+          latencyMs,
+          checkedAt,
+          error: 'Bad Gateway: upstream request blocked',
+        };
+      }
+
       const { outcome, message } = classifyError(e);
 
       return {

@@ -5,12 +5,18 @@ import {
   updateSettingsSchema,
   type UpdateSettingsInput,
 } from '@/lib/validations';
-import { toActionError } from '@/lib/errors';
+import { fail } from '@/lib/response';
 import type { ActionResult } from '@/types/api';
 import type { Settings } from '@/types/domain';
+import { requireAdmin } from '@/lib/auth/require-admin';
 
 export async function getSettingsAction(projectId?: string): Promise<ActionResult<Settings>> {
-  return settingsService.get(projectId);
+  try {
+    await requireAdmin();
+    return settingsService.get(projectId);
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function updateSettingsAction(
@@ -18,16 +24,22 @@ export async function updateSettingsAction(
   projectId?: string
 ): Promise<ActionResult<Settings>> {
   try {
+    await requireAdmin();
     const parsed = updateSettingsSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.issues[0].message };
     }
     return settingsService.update(parsed.data, projectId);
   } catch (e) {
-    return { success: false, error: toActionError(e) };
+    return fail(e);
   }
 }
 
 export async function resetSettingsAction(projectId?: string): Promise<ActionResult<Settings>> {
-  return settingsService.reset(projectId);
+  try {
+    await requireAdmin();
+    return settingsService.reset(projectId);
+  } catch (e) {
+    return fail(e);
+  }
 }

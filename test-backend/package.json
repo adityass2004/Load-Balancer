@@ -1,0 +1,10 @@
+{
+  "name": "test-backend",
+  "version": "1.0.0",
+  "description": "Standalone generic backend test service for TrackIt load balancer testing",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "private": true
+}

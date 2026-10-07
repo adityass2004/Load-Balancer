@@ -2,6 +2,7 @@ import axios from 'axios';
 import { settingsRepository } from '@/repositories/settings.repository';
 import { Algorithm } from '@/types/domain';
 import { buildHealthUrl } from '@/lib/utils';
+import { getSafeAgents, assertLiteralIpAllowed, SsrfBlockedError } from '@/lib/security/ssrf-guard';
 
 export interface ValidationResult {
   isHealthy: boolean;
@@ -27,9 +28,32 @@ export class ServerValidator {
       const timeoutMs = settings.healthCheckTimeout * 1000;
       const healthUrl = buildHealthUrl(url);
 
+      // ── B7: Literal-IP pre-check before making the request ──────────────────
+      try {
+        assertLiteralIpAllowed(healthUrl);
+      } catch (err) {
+        if (err instanceof SsrfBlockedError) {
+          const responseTime = Date.now() - startTime;
+          return {
+            isHealthy: false,
+            responseTime,
+            statusCode: null,
+            errorMessage: 'URL targets a disallowed network address',
+          };
+        }
+        throw err;
+      }
+
+      // ── B7: Use guarded agents ───────────────────────────────────────────────
+      const { httpAgent, httpsAgent } = getSafeAgents();
+
       const response = await axios.get(healthUrl, {
         timeout: timeoutMs,
         validateStatus: () => true,
+        // B7: guard agents + proxy:false
+        httpAgent,
+        httpsAgent,
+        proxy: false,
       });
 
       const responseTime = Date.now() - startTime;
@@ -53,6 +77,16 @@ export class ServerValidator {
     } catch (error: any) {
       const responseTime = Date.now() - startTime;
       let errorMessage = 'Failed to validate server';
+
+      // SsrfBlockedError thrown by guarded lookup at connect time
+      if (error instanceof SsrfBlockedError || error?.code === 'SSRF_BLOCKED') {
+        return {
+          isHealthy: false,
+          responseTime,
+          statusCode: null,
+          errorMessage: 'URL targets a disallowed network address',
+        };
+      }
 
       if (axios.isAxiosError(error)) {
         if (error.code === 'ECONNREFUSED') errorMessage = 'Connection refused by target host';

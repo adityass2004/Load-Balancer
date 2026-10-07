@@ -18,14 +18,15 @@ export class MetricsCollector {
     serverId: string,
     latencyMs: number,
     success: boolean,
-    maxFailures: number
+    maxFailures: number,
+    isClientError = false
   ): Promise<void> {
     cacheService.updateRuntimeMetrics(serverId, {
       activeRequests: -1,
       success,
     });
 
-    if (!success) {
+    if (!success && !isClientError) {
       const failures = cacheService.incrementFailureCountForRequest(serverId, new Date());
 
       if (failures >= maxFailures) {

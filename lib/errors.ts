@@ -41,6 +41,20 @@ export class DatabaseError extends AppError {
   }
 }
 
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Unauthorized') {
+    super(message, 'UNAUTHORIZED', 401);
+    this.name = 'UnauthorizedError';
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = 'Forbidden') {
+    super(message, 'FORBIDDEN', 403);
+    this.name = 'ForbiddenError';
+  }
+}
+
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;
 }

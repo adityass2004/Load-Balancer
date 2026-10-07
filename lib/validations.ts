@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { Algorithm, ServerHealth } from '@/src/generated/prisma';
+import { validateBackendUrl } from '@/lib/security/ssrf-guard';
 
 // ─── Server ────────────────────────────────────────────────────────────────────
 
-export const createServerSchema = z.object({
+/** Base shape without async SSRF check — used internally when URL is not being set. */
+const _createServerBaseSchema = z.object({
   projectId: z.string().uuid().optional().nullable(),
   name: z.string().min(1, 'Name is required').max(100, 'Name must be 100 characters or less'),
   url: z
@@ -18,7 +20,38 @@ export const createServerSchema = z.object({
   priority: z.number({ message: 'Priority must be a number' }).int().min(0, 'Priority cannot be negative').default(0),
 });
 
-export const updateServerSchema = createServerSchema.partial();
+/** Full create schema with SSRF guard applied as an async superRefine on the URL field. */
+export const createServerSchema = _createServerBaseSchema.superRefine(async (data, ctx) => {
+  // Only validate URL when it is present (it's always present on create but guard via check)
+  if (!data.url) return;
+  const result = await validateBackendUrl(data.url);
+  if (!result.ok) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['url'],
+      message: result.reason,
+    });
+  }
+});
+
+/**
+ * Update schema: partial of the base.  When `url` is present, the SSRF guard runs.
+ * When `url` is absent (update changes only name/weight/etc.), the cheap checks are skipped
+ * for that field — the connect-time guard in the agents still protects proxy/health paths.
+ */
+export const updateServerSchema = _createServerBaseSchema
+  .partial()
+  .superRefine(async (data, ctx) => {
+    if (!data.url) return; // URL not being changed — skip DNS round-trip
+    const result = await validateBackendUrl(data.url);
+    if (!result.ok) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['url'],
+        message: result.reason,
+      });
+    }
+  });
 
 export const serverHealthSchema = z.object({
   healthy: z.nativeEnum(ServerHealth),

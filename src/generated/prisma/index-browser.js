@@ -178,6 +178,14 @@ exports.Prisma.RequestLogScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.AdminUserScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  role: 'role',
+  addedBy: 'addedBy',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -217,11 +225,17 @@ exports.HttpMethod = exports.$Enums.HttpMethod = {
   OPTIONS: 'OPTIONS'
 };
 
+exports.AdminRole = exports.$Enums.AdminRole = {
+  OWNER: 'OWNER',
+  ADMIN: 'ADMIN'
+};
+
 exports.Prisma.ModelName = {
   Project: 'Project',
   Server: 'Server',
   Settings: 'Settings',
-  RequestLog: 'RequestLog'
+  RequestLog: 'RequestLog',
+  AdminUser: 'AdminUser'
 };
 
 /**

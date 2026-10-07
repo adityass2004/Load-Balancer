@@ -1,10 +1,20 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { analyticsService } from '@/services/analytics/AnalyticsService';
+import { requireAdmin } from '@/lib/auth/require-admin';
+import { UnauthorizedError, ForbiddenError } from '@/lib/errors';
+import { getClientIp } from '@/lib/client-ip';
+import { rateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const clientIp = getClientIp(request);
+  const limited = await rateLimit('admin:ip', clientIp, request);
+  if (limited) return limited;
+
   try {
+    await requireAdmin();
+
     const [
       stats,
       serverMetrics,
@@ -36,6 +46,18 @@ export async function GET() {
       },
     });
   } catch (error: any) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 401 }
+      );
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 403 }
+      );
+    }
     return NextResponse.json(
       { success: false, error: error?.message || 'Failed to fetch dashboard data' },
       { status: 500 }

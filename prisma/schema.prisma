@@ -144,3 +144,22 @@ model RequestLog {
   @@index([projectId, createdAt])
   @@map("request_logs")
 }
+
+// =========================
+// ADMIN USER & ALLOWLIST
+// =========================
+
+enum AdminRole {
+  OWNER
+  ADMIN
+}
+
+model AdminUser {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  role      AdminRole
+  addedBy   String?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+}

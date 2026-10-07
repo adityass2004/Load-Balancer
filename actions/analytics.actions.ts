@@ -1,6 +1,8 @@
 'use server';
 
 import { analyticsService } from '@/services/analytics/AnalyticsService';
+import { requireAdmin } from '@/lib/auth/require-admin';
+import { fail } from '@/lib/response';
 import type { ActionResult } from '@/types/api';
 import type {
   DashboardStats,
@@ -11,52 +13,93 @@ import type {
 } from '@/types/domain';
 
 export async function getDashboardSnapshotAction(projectId?: string): Promise<ActionResult<CombinedDashboardData>> {
-  return analyticsService.getDashboardSnapshot(projectId);
+  try {
+    await requireAdmin();
+    return analyticsService.getDashboardSnapshot(projectId);
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function getDashboardStatsAction(projectId?: string): Promise<ActionResult<DashboardStats>> {
-  return analyticsService.getDashboardStats(projectId);
+  try {
+    await requireAdmin();
+    return analyticsService.getDashboardStats(projectId);
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function getServerMetricsAction(projectId?: string): Promise<ActionResult<ServerMetric[]>> {
-  return analyticsService.getServerMetrics(projectId);
+  try {
+    await requireAdmin();
+    return analyticsService.getServerMetrics(projectId);
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function getRequestsOverTimeAction(
   hours?: number,
   projectId?: string
 ): Promise<ActionResult<ChartDataPoint[]>> {
-  return analyticsService.getRequestsOverTime(hours, projectId);
+  try {
+    await requireAdmin();
+    return analyticsService.getRequestsOverTime(hours, projectId);
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function getResponseTimeOverTimeAction(
   hours?: number,
   projectId?: string
 ): Promise<ActionResult<ChartDataPoint[]>> {
-  return analyticsService.getResponseTimeOverTime(hours, projectId);
+  try {
+    await requireAdmin();
+    return analyticsService.getResponseTimeOverTime(hours, projectId);
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function getRequestsPerServerAction(projectId?: string): Promise<ActionResult<ChartDataPoint[]>> {
-  return analyticsService.getRequestsPerServer(projectId);
+  try {
+    await requireAdmin();
+    return analyticsService.getRequestsPerServer(projectId);
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function getHealthDistributionAction(projectId?: string): Promise<ActionResult<HealthDistributionItem[]>> {
-  return analyticsService.getHealthDistribution(projectId);
+  try {
+    await requireAdmin();
+    return analyticsService.getHealthDistribution(projectId);
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function getActiveConnectionsOverTimeAction(
   hours?: number,
   projectId?: string
 ): Promise<ActionResult<ChartDataPoint[]>> {
-  return analyticsService.getActiveConnectionsOverTime(hours, projectId);
+  try {
+    await requireAdmin();
+    return analyticsService.getActiveConnectionsOverTime(hours, projectId);
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function triggerHealthCheckAction() {
   try {
+    await requireAdmin();
     const { healthScheduler } = await import('@/services/health/HealthScheduler');
     const results = await healthScheduler.checkAllServers();
     return { success: true, data: results };
   } catch (e) {
-    return { success: false, error: (e as Error).message };
+    return fail(e);
   }
 }

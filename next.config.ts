@@ -1,9 +1,10 @@
 import type { NextConfig } from 'next';
+import { buildAllowedOrigins } from './lib/config/allowed-origins';
 
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
-      allowedOrigins: ['localhost:3000'],
+      allowedOrigins: buildAllowedOrigins(process.env),
     },
   },
   // No rewrites needed.

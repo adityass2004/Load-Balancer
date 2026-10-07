@@ -1,0 +1,29 @@
+{
+  "benchmark": {
+    "target": "https://trackit-load-balancer-277128202535.asia-south1.run.app/api/health",
+    "generatedAt": "2026-09-10T14:02:59.254Z"
+  },
+  "result": "FAIL",
+  "traffic": {
+    "totalRequests": 774011,
+    "actualRPS": 899.14,
+    "iterations": 774010,
+    "droppedIterations": 7189
+  },
+  "errors": {
+    "errorRatePercent": 0
+  },
+  "latency": {
+    "averageMs": 147.87,
+    "p50Ms": 48.27,
+    "p90Ms": 283.86,
+    "p95Ms": 548.83,
+    "p99Ms": 0,
+    "maxMs": 13654.76
+  },
+  "passCriteria": {
+    "errorRate": "< 1%",
+    "p95": "< 5000 ms",
+    "droppedIterations": "0"
+  }
+}
