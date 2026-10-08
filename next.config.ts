@@ -28,6 +28,7 @@ const apiAdminAuthHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   poweredByHeader: false,
   experimental: {
     serverActions: {

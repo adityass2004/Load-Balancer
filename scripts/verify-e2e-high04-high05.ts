@@ -35,6 +35,7 @@ function httpRequest(
 }
 
 async function runE2E() {
+  const TRACKIT_PORT = parseInt(process.env.TRACKIT_PORT || process.env.PORT || '3005', 10);
   console.log('==================================================================');
   console.log('STARTING E2E VERIFICATION (HIGH-04, HIGH-05, LOOP GUARD)');
   console.log('==================================================================\n');
@@ -60,7 +61,7 @@ async function runE2E() {
   // Trigger health check once so TrackIt's in-memory state marks all 3 servers healthy
   await httpRequest({
     hostname: 'localhost',
-    port: 3000,
+    port: TRACKIT_PORT,
     path: '/api/cron/health',
     method: 'GET',
     headers: {
@@ -73,7 +74,7 @@ async function runE2E() {
   console.log('[E2.1] Headers sanitization check:');
   const oddHeadersRes = await httpRequest({
     hostname: 'localhost',
-    port: 3000,
+    port: TRACKIT_PORT,
     path: '/api/test-project/test/headers',
     method: 'GET',
     headers: {
@@ -109,7 +110,7 @@ async function runE2E() {
   // 1. Single entry
   const singleXffRes = await httpRequest({
     hostname: 'localhost',
-    port: 3000,
+    port: TRACKIT_PORT,
     path: '/api/test-project/test/headers',
     method: 'GET',
     headers: {
@@ -122,7 +123,7 @@ async function runE2E() {
   // 2. Spoofed leftmost with trusted rightmost
   const spoofedXffRes = await httpRequest({
     hostname: 'localhost',
-    port: 3000,
+    port: TRACKIT_PORT,
     path: '/api/test-project/test/headers',
     method: 'GET',
     headers: {
@@ -153,7 +154,7 @@ async function runE2E() {
   for (let i = 0; i < 30; i++) {
     const res = await httpRequest({
       hostname: 'localhost',
-      port: 3000,
+      port: TRACKIT_PORT,
       path: '/api/test-project/test/info',
       method: 'GET',
       headers: {
@@ -172,7 +173,7 @@ async function runE2E() {
   for (let i = 0; i < 30; i++) {
     const res = await httpRequest({
       hostname: 'localhost',
-      port: 3000,
+      port: TRACKIT_PORT,
       path: '/api/test-project/test/info',
       method: 'GET',
       headers: {
@@ -191,7 +192,7 @@ async function runE2E() {
   for (let i = 1; i <= 300; i++) {
     const res = await httpRequest({
       hostname: 'localhost',
-      port: 3000,
+      port: TRACKIT_PORT,
       path: '/api/test-project/test/info',
       method: 'GET',
       headers: {
@@ -209,7 +210,7 @@ async function runE2E() {
   const targetIp = '198.51.100.88';
   const initialRes = await httpRequest({
     hostname: 'localhost',
-    port: 3000,
+    port: TRACKIT_PORT,
     path: '/api/test-project/test/info',
     method: 'GET',
     headers: { 'X-Forwarded-For': targetIp },
@@ -233,7 +234,7 @@ async function runE2E() {
   for (let i = 0; i < 10; i++) {
     const res = await httpRequest({
       hostname: 'localhost',
-      port: 3000,
+      port: TRACKIT_PORT,
       path: '/api/test-project/test/info',
       method: 'GET',
       headers: { 'X-Forwarded-For': targetIp },
@@ -269,7 +270,7 @@ async function runE2E() {
   // Trigger health check cycle so in-memory health monitor probes port and marks healthy
   await httpRequest({
     hostname: 'localhost',
-    port: 3000,
+    port: TRACKIT_PORT,
     path: '/api/cron/health',
     method: 'GET',
     headers: {
@@ -280,7 +281,7 @@ async function runE2E() {
 
   const recoveryRes = await httpRequest({
     hostname: 'localhost',
-    port: 3000,
+    port: TRACKIT_PORT,
     path: '/api/test-project/test/info',
     method: 'GET',
     headers: { 'X-Forwarded-For': targetIp },
@@ -306,7 +307,7 @@ async function runE2E() {
   const chunkedRes = await httpRequest(
     {
       hostname: 'localhost',
-      port: 3000,
+      port: TRACKIT_PORT,
       path: '/api/test-project/test',
       method: 'POST',
       headers: {
@@ -329,7 +330,7 @@ async function runE2E() {
   const clRes = await httpRequest(
     {
       hostname: 'localhost',
-      port: 3000,
+      port: TRACKIT_PORT,
       path: '/api/test-project/test',
       method: 'POST',
       headers: {
@@ -349,7 +350,7 @@ async function runE2E() {
   console.log('\n[E2.6] Gzip response behavior verification:');
   const gzipRes = await httpRequest({
     hostname: 'localhost',
-    port: 3000,
+    port: TRACKIT_PORT,
     path: '/api/test-project/test/gzip',
     method: 'GET',
     headers: {
@@ -388,7 +389,7 @@ async function runE2E() {
   // 1. Direct request with x-trackit-hop: 3
   const directLoopRes = await httpRequest({
     hostname: 'localhost',
-    port: 3000,
+    port: TRACKIT_PORT,
     path: '/api/test-project/test/headers',
     method: 'GET',
     headers: {
@@ -420,7 +421,7 @@ async function runE2E() {
   const loopStart = Date.now();
   const loopRes = await httpRequest({
     hostname: 'localhost',
-    port: 3000,
+    port: TRACKIT_PORT,
     path: '/api/loop-project/loop',
     method: 'GET',
   });
