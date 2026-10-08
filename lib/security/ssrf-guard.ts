@@ -93,6 +93,18 @@ function loadSsrfConfig(): SsrfConfig {
         );
       }
 
+      // Loopback range rejection in production mode
+      const isLoopbackAddr =
+        check.category === 'loopback' ||
+        check.category.endsWith(':loopback') ||
+        check.category === 'ipv6-carrier:loopback';
+
+      if (isLoopbackAddr && isProduction) {
+        throw new Error(
+          `[SSRF] FATAL: BACKEND_ALLOWED_PRIVATE_CIDRS entry "${raw}" specifies a loopback range in production. Loopback access is forbidden in production.`
+        );
+      }
+
       allowedPrivateCidrs.push({ network: addr, prefix });
     }
   }
