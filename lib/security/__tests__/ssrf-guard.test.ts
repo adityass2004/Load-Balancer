@@ -713,3 +713,56 @@ describe('validateBackendUrl — edge cases', () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe('BACKEND_ALLOWED_PRIVATE_CIDRS loopback restrictions in production', () => {
+  it('throws in production when BACKEND_ALLOWED_PRIVATE_CIDRS contains 127.0.0.0/8', () => {
+    resetSsrfConfigForTesting();
+    const cleanup = withEnv({
+      NODE_ENV: 'production',
+      BACKEND_ALLOWED_PRIVATE_CIDRS: '127.0.0.0/8',
+    });
+    expect(() => getSsrfConfig()).toThrow(
+      /FATAL: BACKEND_ALLOWED_PRIVATE_CIDRS entry "127.0.0.0\/8" specifies a loopback range in production/
+    );
+    cleanup();
+  });
+
+  it('throws in production when BACKEND_ALLOWED_PRIVATE_CIDRS contains ::1/128', () => {
+    resetSsrfConfigForTesting();
+    const cleanup = withEnv({
+      NODE_ENV: 'production',
+      BACKEND_ALLOWED_PRIVATE_CIDRS: '::1/128',
+    });
+    expect(() => getSsrfConfig()).toThrow(
+      /FATAL: BACKEND_ALLOWED_PRIVATE_CIDRS entry "::1\/128" specifies a loopback range in production/
+    );
+    cleanup();
+  });
+
+  it('allows 127.0.0.0/8 in development mode', () => {
+    resetSsrfConfigForTesting();
+    const cleanup = withEnv({
+      NODE_ENV: 'development',
+      BACKEND_ALLOWED_PRIVATE_CIDRS: '127.0.0.0/8',
+    });
+    expect(() => getSsrfConfig()).not.toThrow();
+    const res = classifyAddress('127.0.0.1');
+    expect(res.blocked).toBe(false);
+    expect(res.category).toContain('allowed-cidr');
+    cleanup();
+  });
+
+  it('allows ::1/128 in development mode', () => {
+    resetSsrfConfigForTesting();
+    const cleanup = withEnv({
+      NODE_ENV: 'development',
+      BACKEND_ALLOWED_PRIVATE_CIDRS: '::1/128',
+    });
+    expect(() => getSsrfConfig()).not.toThrow();
+    const res = classifyAddress('::1');
+    expect(res.blocked).toBe(false);
+    expect(res.category).toContain('allowed-cidr');
+    cleanup();
+  });
+});
+
