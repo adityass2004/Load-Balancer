@@ -23,6 +23,7 @@ import {
   getSafeAgents,
   createGuardedLookup,
   getSsrfConfig,
+  getBackendConnectTimeoutMs,
   SsrfBlockedError,
   resetSsrfConfigForTesting,
   resetSafeAgentsForTesting,
@@ -762,6 +763,29 @@ describe('BACKEND_ALLOWED_PRIVATE_CIDRS loopback restrictions in production', ()
     const res = classifyAddress('::1');
     expect(res.blocked).toBe(false);
     expect(res.category).toContain('allowed-cidr');
+    cleanup();
+  });
+});
+
+describe('getBackendConnectTimeoutMs', () => {
+  it('returns default 2000 ms when BACKEND_CONNECT_TIMEOUT_MS is unset', () => {
+    resetSsrfConfigForTesting();
+    const cleanup = withEnv({ BACKEND_CONNECT_TIMEOUT_MS: undefined });
+    expect(getBackendConnectTimeoutMs()).toBe(2000);
+    cleanup();
+  });
+
+  it('returns parsed number when BACKEND_CONNECT_TIMEOUT_MS is set to a valid integer string', () => {
+    resetSsrfConfigForTesting();
+    const cleanup = withEnv({ BACKEND_CONNECT_TIMEOUT_MS: '1500' });
+    expect(getBackendConnectTimeoutMs()).toBe(1500);
+    cleanup();
+  });
+
+  it('falls back to 2000 ms if BACKEND_CONNECT_TIMEOUT_MS is invalid or below 100', () => {
+    resetSsrfConfigForTesting();
+    const cleanup = withEnv({ BACKEND_CONNECT_TIMEOUT_MS: 'invalid' });
+    expect(getBackendConnectTimeoutMs()).toBe(2000);
     cleanup();
   });
 });

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Server } from '@/types/domain';
 import type { RequestPayload } from './body-policy';
-import { getSafeAgents, assertLiteralIpAllowed, SsrfBlockedError } from '@/lib/security/ssrf-guard';
+import { getSafeAgents, assertLiteralIpAllowed, SsrfBlockedError, getBackendConnectTimeoutMs } from '@/lib/security/ssrf-guard';
 import {
   sanitizeRequestHeaders,
   sanitizeResponseHeaders,
@@ -89,13 +89,15 @@ export class RequestForwarder {
       maxRedirects = 3;
     }
 
+    const effectiveTimeout = Math.min(timeoutMs, getBackendConnectTimeoutMs());
+
     // Call the backend
     const response = await axios({
       method: request.method,
       url: targetUrl,
       headers,
       data,
-      timeout: timeoutMs,
+      timeout: effectiveTimeout,
       validateStatus: () => true, // Do not throw on HTTP status errors, forward them
       responseType: 'arraybuffer',
       maxBodyLength: Infinity,

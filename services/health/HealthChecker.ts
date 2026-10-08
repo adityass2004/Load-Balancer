@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios';
 import type { IHealthChecker, HealthCheckResult, HealthCheckOutcome } from '@/types/health';
 import type { Server } from '@/types/domain';
 import { buildHealthUrl } from '@/lib/utils';
-import { getSafeAgents, assertLiteralIpAllowed, SsrfBlockedError } from '@/lib/security/ssrf-guard';
+import { getSafeAgents, assertLiteralIpAllowed, SsrfBlockedError, getBackendConnectTimeoutMs } from '@/lib/security/ssrf-guard';
 
 class HealthChecker implements IHealthChecker {
   async check(
@@ -42,8 +42,9 @@ class HealthChecker implements IHealthChecker {
     const { httpAgent, httpsAgent } = getSafeAgents(server.id);
 
     try {
+      const effectiveTimeout = Math.min(timeoutMs, getBackendConnectTimeoutMs());
       const response = await axios.get(targetUrl, {
-        timeout: timeoutMs,
+        timeout: effectiveTimeout,
         validateStatus: () => true, // handle all status codes manually
         headers: { 'User-Agent': 'LoadBalancer-HealthChecker/1.0' },
         // B7: guard agents + proxy:false so HTTP_PROXY cannot bypass the guard

@@ -45,12 +45,21 @@ function loadSsrfConfig(): SsrfConfig {
       .enum(['true', 'false', ''])
       .optional()
       .default('false'),
+    BACKEND_CONNECT_TIMEOUT_MS: z
+      .string()
+      .optional()
+      .default('2000')
+      .transform((val) => {
+        const parsed = parseInt(val || '2000', 10);
+        return isNaN(parsed) || parsed < 100 ? 2000 : parsed;
+      }),
     NODE_ENV: z.string().optional().default('development'),
   });
 
   const parsed = schema.safeParse({
     BACKEND_ALLOWED_PRIVATE_CIDRS: process.env.BACKEND_ALLOWED_PRIVATE_CIDRS ?? '',
     BACKEND_ALLOW_LOOPBACK: process.env.BACKEND_ALLOW_LOOPBACK ?? 'false',
+    BACKEND_CONNECT_TIMEOUT_MS: process.env.BACKEND_CONNECT_TIMEOUT_MS ?? '2000',
     NODE_ENV: process.env.NODE_ENV ?? 'development',
   });
 
@@ -62,6 +71,7 @@ function loadSsrfConfig(): SsrfConfig {
 
   const allowLoopback = parsed.data.BACKEND_ALLOW_LOOPBACK === 'true';
   const isProduction = parsed.data.NODE_ENV === 'production';
+  const connectTimeoutMs = parsed.data.BACKEND_CONNECT_TIMEOUT_MS;
 
   // Loopback in production is a hard startup error
   if (allowLoopback && isProduction) {
@@ -109,13 +119,18 @@ function loadSsrfConfig(): SsrfConfig {
     }
   }
 
-  return { allowLoopback, isProduction, allowedPrivateCidrs };
+  return { allowLoopback, isProduction, allowedPrivateCidrs, connectTimeoutMs };
 }
 
 interface SsrfConfig {
   allowLoopback: boolean;
   isProduction: boolean;
   allowedPrivateCidrs: Array<{ network: string; prefix: number }>;
+  connectTimeoutMs: number;
+}
+
+export function getBackendConnectTimeoutMs(): number {
+  return getSsrfConfig().connectTimeoutMs;
 }
 
 // Lazily-initialized singleton config (reset in tests via resetSsrfConfigForTesting)
