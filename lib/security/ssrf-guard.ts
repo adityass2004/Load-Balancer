@@ -759,6 +759,53 @@ export function createGuardedLookup(serverId?: string): GuardedLookupFunction {
 
 // ─── Shared safe agents ────────────────────────────────────────────────────────
 
+class TimeoutHttpAgent extends http.Agent {
+  createConnection(options: any, callback?: any): net.Socket {
+    const socket = super.createConnection(options, callback);
+    const timeoutMs = getBackendConnectTimeoutMs();
+
+    const timer = setTimeout(() => {
+      if (socket && !socket.destroyed) {
+        const err = new Error(`connect ETIMEDOUT (connect timeout ${timeoutMs}ms)`);
+        (err as any).code = 'ETIMEDOUT';
+        socket.destroy(err);
+      }
+    }, timeoutMs);
+
+    if (socket) {
+      socket.once('connect', () => clearTimeout(timer));
+      socket.once('error', () => clearTimeout(timer));
+      socket.once('close', () => clearTimeout(timer));
+    }
+
+    return socket as net.Socket;
+  }
+}
+
+class TimeoutHttpsAgent extends https.Agent {
+  createConnection(options: any, callback?: any): net.Socket {
+    const socket = super.createConnection(options, callback);
+    const timeoutMs = getBackendConnectTimeoutMs();
+
+    const timer = setTimeout(() => {
+      if (socket && !socket.destroyed) {
+        const err = new Error(`connect ETIMEDOUT (connect timeout ${timeoutMs}ms)`);
+        (err as any).code = 'ETIMEDOUT';
+        socket.destroy(err);
+      }
+    }, timeoutMs);
+
+    if (socket) {
+      socket.once('secureConnect', () => clearTimeout(timer));
+      socket.once('connect', () => {});
+      socket.once('error', () => clearTimeout(timer));
+      socket.once('close', () => clearTimeout(timer));
+    }
+
+    return socket as net.Socket;
+  }
+}
+
 interface SafeAgents {
   httpAgent: http.Agent;
   httpsAgent: https.Agent;
@@ -767,15 +814,16 @@ interface SafeAgents {
 let _safeAgents: SafeAgents | null = null;
 
 /**
- * Returns a singleton pair of http/https agents that use the guarded DNS lookup.
+ * Returns a singleton pair of http/https agents that use the guarded DNS lookup
+ * and enforce socket-level connection timeout.
  * Do NOT add keepAlive here — that is a separate tuning item (HIGH-XX).
  */
 export function getSafeAgents(serverId?: string): SafeAgents {
   if (!_safeAgents) {
     const lookup = createGuardedLookup(serverId);
     _safeAgents = {
-      httpAgent: new http.Agent({ lookup } as http.AgentOptions),
-      httpsAgent: new https.Agent({ lookup } as https.AgentOptions),
+      httpAgent: new TimeoutHttpAgent({ lookup } as http.AgentOptions),
+      httpsAgent: new TimeoutHttpsAgent({ lookup } as https.AgentOptions),
     };
   }
   return _safeAgents;
