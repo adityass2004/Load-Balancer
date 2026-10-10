@@ -48,10 +48,10 @@ function loadSsrfConfig(): SsrfConfig {
     BACKEND_CONNECT_TIMEOUT_MS: z
       .string()
       .optional()
-      .default('2000')
+      .default('5000')
       .transform((val) => {
-        const parsed = parseInt(val || '2000', 10);
-        return isNaN(parsed) || parsed < 100 ? 2000 : parsed;
+        const parsed = parseInt(val || '5000', 10);
+        return isNaN(parsed) || parsed < 100 ? 5000 : parsed;
       }),
     NODE_ENV: z.string().optional().default('development'),
   });
@@ -59,7 +59,7 @@ function loadSsrfConfig(): SsrfConfig {
   const parsed = schema.safeParse({
     BACKEND_ALLOWED_PRIVATE_CIDRS: process.env.BACKEND_ALLOWED_PRIVATE_CIDRS ?? '',
     BACKEND_ALLOW_LOOPBACK: process.env.BACKEND_ALLOW_LOOPBACK ?? 'false',
-    BACKEND_CONNECT_TIMEOUT_MS: process.env.BACKEND_CONNECT_TIMEOUT_MS ?? '2000',
+    BACKEND_CONNECT_TIMEOUT_MS: process.env.BACKEND_CONNECT_TIMEOUT_MS ?? '5000',
     NODE_ENV: process.env.NODE_ENV ?? 'development',
   });
 

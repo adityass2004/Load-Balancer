@@ -5,9 +5,13 @@ import { cacheService } from '@/services/cache/CacheService';
 import { healthScheduler } from '@/services/health/HealthScheduler';
 import { ServerHealth } from '@/types/domain';
 
+import { cacheInitializer } from '@/services/cache/CacheInitializer';
+
 describe('Public Root Endpoint GET /api/{projectSlug} (HIGH-06)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(cacheInitializer, 'init').mockResolvedValue();
+    vi.spyOn(healthScheduler, 'startMonitoring').mockResolvedValue([]);
   });
 
   it('reads health ONLY from in-memory cache and makes ZERO calls to healthScheduler.checkServer', async () => {

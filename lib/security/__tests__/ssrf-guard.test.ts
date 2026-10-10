@@ -768,10 +768,10 @@ describe('BACKEND_ALLOWED_PRIVATE_CIDRS loopback restrictions in production', ()
 });
 
 describe('getBackendConnectTimeoutMs', () => {
-  it('returns default 2000 ms when BACKEND_CONNECT_TIMEOUT_MS is unset', () => {
+  it('returns default 5000 ms when BACKEND_CONNECT_TIMEOUT_MS is unset', () => {
     resetSsrfConfigForTesting();
     const cleanup = withEnv({ BACKEND_CONNECT_TIMEOUT_MS: undefined });
-    expect(getBackendConnectTimeoutMs()).toBe(2000);
+    expect(getBackendConnectTimeoutMs()).toBe(5000);
     cleanup();
   });
 
@@ -782,10 +782,10 @@ describe('getBackendConnectTimeoutMs', () => {
     cleanup();
   });
 
-  it('falls back to 2000 ms if BACKEND_CONNECT_TIMEOUT_MS is invalid or below 100', () => {
+  it('falls back to 5000 ms if BACKEND_CONNECT_TIMEOUT_MS is invalid or below 100', () => {
     resetSsrfConfigForTesting();
     const cleanup = withEnv({ BACKEND_CONNECT_TIMEOUT_MS: 'invalid' });
-    expect(getBackendConnectTimeoutMs()).toBe(2000);
+    expect(getBackendConnectTimeoutMs()).toBe(5000);
     cleanup();
   });
 });
